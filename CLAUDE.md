@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## All green lights
+
+This is an all-green-lights project. Deploy: no production deploy is set up yet, so pushing to main is the whole ship step. Never `railway up`.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
