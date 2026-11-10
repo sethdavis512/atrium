@@ -206,7 +206,7 @@ test.describe('Canvas controls', () => {
         await page.goto(`${path}/cards/${note.id}`);
         await waitForHydration(page);
         const canvas = (await page
-            .getByRole('application', { name: 'Company surface' })
+            .getByRole('application', { name: 'Atrium canvas' })
             .boundingBox())!;
         // The strip of canvas above the focused card, clear of "Back".
         await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + 30);

@@ -1,5 +1,5 @@
 /**
- * The company surface: every kind of information the company holds (chats
+ * Atrium's surface: every kind of information the company holds (chats
  * and documents today; slides, sites, and more later) and how they relate.
  * Client-safe types and constants; the data comes from
  * `~/models/surface.server`.

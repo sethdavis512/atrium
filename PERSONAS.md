@@ -1,6 +1,6 @@
 # Personas
 
-Who Company Surface is for, written so product, copy, and feature decisions
+Who Atrium is for, written so product, copy, and feature decisions
 can be checked against real kinds of people: "would Rosa open this before a
 customer call?", "can Nora find her way around a surface she didn't make?".
 They are composites, not real people. Three of them are already in the seed
@@ -40,7 +40,7 @@ engineering, design, and customer success that all touch it.
 - Every review starts with ten minutes of "where's the link?".
 - Status decks are out of date the morning after they're written.
 
-**How Maya uses Company Surface**
+**How Maya uses Atrium**
 
 - The **launch brief** as a document, with `@` links to the board, the
   chart, and the chat where each call was made.
@@ -90,7 +90,7 @@ human ones.
 - The docs page an agent relied on is lost by review time.
 - Retros on agent work are anecdotes, not evidence.
 
-**How Dev uses Company Surface**
+**How Dev uses Atrium**
 
 - **Live agent chats** (with `ANTHROPIC_API_KEY` set) whose tool calls show
   as cards and leave cards on the surface.
@@ -133,7 +133,7 @@ mid-rollout and asking about SSO.
   memory.
 - Product asks "which customers want this?" and the answer takes a day.
 
-**How Rosa uses Company Surface**
+**How Rosa uses Atrium**
 
 - A **surface per account** in the Customers space, with an account
   **document** (the SSO plan) and the customer's own site as a **web page**.
@@ -177,7 +177,7 @@ components. Works with two design boards and a lot of references.
   opens.
 - Quick sketches happen on paper and never reach the team.
 
-**How Kenji uses Company Surface**
+**How Kenji uses Atrium**
 
 - **Images and GIFs** as reference cards, letterboxed and readable in dark
   mode on their light mat.
@@ -220,7 +220,7 @@ a link.
   wasn't part of.
 - A canvas someone else made can look like a wall of cards.
 
-**How Nora uses Company Surface**
+**How Nora uses Atrium**
 
 - **Saved views** in the left nav as a guided tour someone left behind.
 - **Focus** (double-click a header) to read one card at full size, then
@@ -265,7 +265,7 @@ store people do, and every change shows on open canvases within seconds.
 - No sense of space: an agent can add ten cards and bury the one a person
   was reading.
 
-**How the agent uses Company Surface**
+**How the agent uses Atrium**
 
 - `list_cards`, `get_card`, and `search` to read; `get_layout` to see where
   things sit.
@@ -288,11 +288,11 @@ them, arranges them into a column, and saves a view.
 ## Who this is not for
 
 **The diagrammer.** Wants flowcharts, shapes, and connectors drawn to the
-pixel. Company Surface is a canvas of working cards, not a whiteboard;
+pixel. Atrium is a canvas of working cards, not a whiteboard;
 flowchart shapes were removed on 2026-10-25, and features should not drift
 back toward Miro.
 
-**The system-of-record admin.** Wants Company Surface to replace Linear,
+**The system-of-record admin.** Wants Atrium to replace Linear,
 the CRM, or the repository, with permissions and audit trails. Boards, pull
 requests, and charts are views of work that lives elsewhere (mocks today,
 integrations later), not the source of truth.

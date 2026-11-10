@@ -76,7 +76,7 @@ test.describe('surface', () => {
             await page.goto('/surfaces/atlas-launch');
             await settle(page);
             await expect(
-                page.getByRole('application', { name: 'Company surface' }),
+                page.getByRole('application', { name: 'Atrium canvas' }),
             ).toBeVisible();
             await snap(page, testInfo, `surface-${theme}`);
             await context.close();

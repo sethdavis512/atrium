@@ -1064,7 +1064,7 @@ export function SurfaceCanvas({
                                                         padding:
                                                             INITIAL_FIT_PADDING,
                                                     }}
-                                                    ariaLabel="Company surface"
+                                                    ariaLabel="Atrium canvas"
                                                     className="size-full"
                                                     style={canvasStyle}
                                                 >

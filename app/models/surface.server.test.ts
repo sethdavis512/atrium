@@ -837,7 +837,7 @@ describe('surface store', () => {
                     }[];
                 }
             >
-        )[Symbol.for('company-surface.mock-store')]!;
+        )[Symbol.for('atrium.mock-store')]!;
         raw.items.push({
             kind: 'shape',
             id: 'shape-old',

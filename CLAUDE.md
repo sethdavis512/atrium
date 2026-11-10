@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Company Surface is one place for every kind of company information (chats and documents today; slides, sites, and more later) and how the pieces relate, laid out as windows on a Trellis canvas. It is a copy of the Iridium template (React Router v8 SSR, Better Auth, Prisma/PostgreSQL); the template's AI chat, notes, dashboard, settings, and admin routes were removed, and their libraries and models remain unused for now.
+Atrium is one place for every kind of company information (chats and documents today; slides, sites, and more later) and how the pieces relate, laid out as windows on a Trellis canvas. It is a copy of the Iridium template (React Router v8 SSR, Better Auth, Prisma/PostgreSQL); the template's AI chat, notes, dashboard, settings, and admin routes were removed, and their libraries and models remain unused for now.
 
 ### The surface
 

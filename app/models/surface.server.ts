@@ -746,7 +746,7 @@ SSO is a *fast follow*, not day one. It ships behind a flag ([#485](item:pr-sso-
 }
 
 // Kept on globalThis so dev-server reloads of this module keep the data.
-const STORE_KEY = Symbol.for('company-surface.mock-store');
+const STORE_KEY = Symbol.for('atrium.mock-store');
 type WithStore = typeof globalThis & { [STORE_KEY]?: Store };
 
 function store(): Store {

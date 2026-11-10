@@ -36,7 +36,7 @@ async function openFreshSurface(page: Page) {
 /** Right-clicks empty canvas at a point inside it. */
 async function rightClickCanvas(page: Page, fx = 0.6, fy = 0.6) {
     const canvas = (await page
-        .getByRole('application', { name: 'Company surface' })
+        .getByRole('application', { name: 'Atrium canvas' })
         .boundingBox())!;
     const point = {
         x: canvas.x + canvas.width * fx,

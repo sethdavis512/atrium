@@ -41,7 +41,7 @@ test.describe('Adding cards', () => {
         const chat = page.getByRole('region', { name: 'Chat: New chat' });
         await expect(chat).toBeVisible();
         const canvas = (await page
-            .getByRole('application', { name: 'Company surface' })
+            .getByRole('application', { name: 'Atrium canvas' })
             .boundingBox())!;
         await expect
             .poll(async () => {

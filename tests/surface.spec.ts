@@ -91,7 +91,7 @@ test.describe('Surface', () => {
     }) => {
         await page.goto(SURFACE);
         const canvas = page.getByRole('application', {
-            name: 'Company surface',
+            name: 'Atrium canvas',
         });
         await expect(canvas).toBeVisible();
 
@@ -178,7 +178,7 @@ test.describe('Surface', () => {
     }) => {
         await page.goto(SURFACE + '/cards/doc-brief');
         const canvas = page.getByRole('application', {
-            name: 'Company surface',
+            name: 'Atrium canvas',
         });
         const doc = page.getByRole('article', {
             name: 'Document: Atlas launch brief',
@@ -366,7 +366,7 @@ test.describe('Surface', () => {
             .getByRole('button', { name: 'Bring Atlas launch brief to front' })
             .locator('xpath=..');
         const canvas = (await page
-            .getByRole('application', { name: 'Company surface' })
+            .getByRole('application', { name: 'Atrium canvas' })
             .boundingBox())!;
         const awayFromWindows = async () =>
             page.mouse.move(canvas.x + 20, canvas.y + canvas.height - 20);
@@ -866,7 +866,7 @@ test.describe('Surface', () => {
             }
         }
         const canvas = (await page
-            .getByRole('application', { name: 'Company surface' })
+            .getByRole('application', { name: 'Atrium canvas' })
             .boundingBox())!;
         /** Where a window sits in the canvas: left, top, and width. */
         async function placement(article: Locator) {
@@ -1339,7 +1339,7 @@ test.describe('Surface', () => {
                 .getByText('That card is not on this surface.'),
         ).toBeVisible();
         await expect(
-            page.getByRole('application', { name: 'Company surface' }),
+            page.getByRole('application', { name: 'Atrium canvas' }),
         ).toBeVisible();
     });
 

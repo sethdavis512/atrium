@@ -1,4 +1,4 @@
-# Company Surface
+# Atrium
 
 One place for every kind of company information and how it relates. Today that is a canvas of windows (phone-sized chats and 16:9 documents, joined by their relations) built on [Trellis](https://github.com/sethdavis512/trellis), with mock data and a mock chat service. Slides, sites, and more come later.
 
@@ -11,7 +11,7 @@ Agents can work on the surface through MCP at `/api/mcp` (Streamable HTTP). Tool
 With the dev server running, this repo's `.mcp.json` points Claude Code at it (approve the server when asked). To add it anywhere else:
 
 ```sh
-claude mcp add --transport http company-surface http://localhost:5173/api/mcp
+claude mcp add --transport http atrium http://localhost:5173/api/mcp
 ```
 
 The data is a mock: an in-memory store shared by everyone, reset when the server restarts. Without `MCP_API_KEY` the endpoint is open in development and off in production; once it's set, agents must send `Authorization: Bearer <MCP_API_KEY>` (`claude mcp add ... --header "Authorization: Bearer <key>"`).

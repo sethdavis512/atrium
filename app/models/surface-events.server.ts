@@ -32,7 +32,7 @@ type Room = {
 type Hub = { rooms: Map<string, Room>; flushScheduled: boolean };
 
 // Kept on globalThis, like the store, so dev reloads keep open streams.
-const HUB_KEY = Symbol.for('company-surface.surface-events');
+const HUB_KEY = Symbol.for('atrium.surface-events');
 type WithHub = typeof globalThis & { [HUB_KEY]?: Hub };
 
 function hub(): Hub {
