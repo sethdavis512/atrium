@@ -5,7 +5,7 @@ import { cx } from 'cva.config';
 import { isAgentMade, type DocumentItem } from '~/lib/surface';
 import { Avatar } from './Avatar';
 import { DocumentBody } from './DocumentBody';
-import { DocumentEditor } from './DocumentEditor';
+import { DocumentEditor, useDocumentSaveState } from './DocumentEditor';
 import { WindowControls } from './WindowControls';
 import { ZoomOverlay } from './ZoomOverlay';
 import {
@@ -26,6 +26,7 @@ export function DocumentWindow({ data, selected }: NodeProps<DocumentNode>) {
     const author = personById(doc.authorId);
     const focused = use(FocusedItemContext) === doc.id;
     const { colorOf } = useWindowColors();
+    const saveState = useDocumentSaveState(doc.id);
 
     return (
         <div className="group/window relative size-full">
@@ -88,7 +89,7 @@ export function DocumentWindow({ data, selected }: NodeProps<DocumentNode>) {
                     <div className="prose prose-sm dark:prose-invert mx-auto max-w-3xl">
                         <h1>{doc.title}</h1>
                         {focused ? (
-                            <DocumentEditor doc={doc} />
+                            <DocumentEditor doc={doc} saveState={saveState} />
                         ) : (
                             <DocumentBody blocks={doc.blocks} />
                         )}

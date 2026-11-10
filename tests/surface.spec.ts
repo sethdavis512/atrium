@@ -1025,6 +1025,102 @@ test.describe('Surface', () => {
         await expect(alert).toHaveCount(0);
     });
 
+    test('a document conflict can keep your version, and leaving mid-save still saves', async ({
+        authedPage: page,
+    }) => {
+        // Its own document, reused across runs like the editor test's.
+        const title = 'Editor conflict test';
+        const items: { id: string; title: string }[] = await mcp(
+            page,
+            'list_cards',
+            {},
+        );
+        const docId =
+            items.find((item) => item.title === title)?.id ??
+            (
+                await mcp(page, 'create_document', {
+                    surfaceId: SURFACE_ID,
+                    title,
+                })
+            ).id;
+        const markdown = async () =>
+            (await mcp(page, 'get_card', { itemId: docId })).markdown;
+        const rewrite = async (text: string) => {
+            await editor.click();
+            await page.keyboard.press('ControlOrMeta+a');
+            await page.keyboard.press('Backspace');
+            await page.keyboard.type(text);
+        };
+
+        // What the editor shows: one plain paragraph, so its Markdown too.
+        const text = async () => (await editor.innerText()).trim();
+
+        await page.goto(`${SURFACE}/cards/${docId}`);
+        await waitForHydration(page);
+        const editor = page.getByRole('textbox', { name: `Edit ${title}` });
+        const alert = page.getByRole('alert').filter({
+            hasText: 'Someone else changed this document',
+        });
+        await rewrite('Mine one');
+        await expect.poll(markdown, { timeout: 10_000 }).toBe('Mine one');
+
+        // An agent writes while nothing of yours is unsaved: keep yours.
+        await mcp(page, 'append_to_document', {
+            documentId: docId,
+            markdown: 'Agent line',
+        });
+        await expect(alert).toBeVisible();
+        await alert.getByRole('button', { name: 'Keep mine' }).click();
+        await expect.poll(markdown, { timeout: 10_000 }).toBe('Mine one');
+        await expect(alert).toHaveCount(0);
+
+        // An agent writes and you type before hearing of it: the save is
+        // refused, and keeping yours sends it again over theirs.
+        await mcp(page, 'append_to_document', {
+            documentId: docId,
+            markdown: 'Agent again',
+        });
+        await editor.click();
+        await page.keyboard.type('two');
+        await expect(alert).toContainText('was not saved');
+        const kept = await text();
+        expect(kept).toContain('two');
+        await alert.getByRole('button', { name: 'Keep mine' }).click();
+        await expect.poll(markdown, { timeout: 10_000 }).toBe(kept);
+        await expect(alert).toHaveCount(0);
+
+        // Leaving while a save is on its way: what you typed since still
+        // saves, on top of that save's version. The first save is held here
+        // until the editor has closed.
+        let release = () => {};
+        let held = false;
+        const holding = new Promise<void>((started) => {
+            void page.route(
+                (url) => url.pathname.startsWith(SURFACE),
+                async (route) => {
+                    const body = route.request().postData() ?? '';
+                    if (held || !body.includes('update-document')) {
+                        return route.fallback();
+                    }
+                    held = true;
+                    started();
+                    await new Promise<void>((resolve) => (release = resolve));
+                    await route.continue();
+                },
+            );
+        });
+        await editor.click();
+        await page.keyboard.type('three');
+        await holding;
+        await page.keyboard.type('four');
+        const left = await text();
+        expect(left).toContain('four');
+        await page.getByRole('link', { name: 'Back to canvas' }).click();
+        await expect(page).toHaveURL(SURFACE_URL);
+        release();
+        await expect.poll(markdown, { timeout: 10_000 }).toBe(left);
+    });
+
     test('videos play YouTube, and web pages browse with an address bar that saves', async ({
         authedPage: page,
     }) => {

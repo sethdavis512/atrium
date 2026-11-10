@@ -1209,7 +1209,7 @@ export function postMessage({
         !isAgentChat(chat, isMember) &&
         repliers.length > 0
     ) {
-        chat.awaitingReply = true;
+        const replied = countReply(chat);
         setTimeout(() => {
             chat.messages.push(
                 pickMockReply(
@@ -1217,20 +1217,41 @@ export function postMessage({
                     { meId: authorId, exclude: [AGENT_ID] },
                 ),
             );
-            chat.awaitingReply = false;
+            replied();
             markChanged();
         }, MOCK_REPLY_DELAY_MS);
     }
     return structuredClone(message);
 }
 
-/** Shows (or stops showing) someone typing in a chat: the live agent's turn. */
-export function setAwaitingReply(chatId: string, awaiting: boolean) {
+/**
+ * Counts one more reply on its way to a chat, so it shows someone typing,
+ * and returns what to call when that reply lands or fails. The chat stops
+ * showing typing when every reply counted has; calling it again changes
+ * nothing, and it never throws (the chat may be deleted by then).
+ */
+function countReply(chat: ChatItem): () => void {
+    chat.pendingReplies = (chat.pendingReplies ?? 0) + 1;
+    chat.awaitingReply = true;
+    let done = false;
+    return () => {
+        if (done) return;
+        done = true;
+        chat.pendingReplies = Math.max(0, (chat.pendingReplies ?? 0) - 1);
+        chat.awaitingReply = chat.pendingReplies > 0;
+    };
+}
+
+/**
+ * Shows someone typing in a chat (the live agent's turn) until the function
+ * it returns is called: once the reply is saved, or the turn failed.
+ */
+export function expectReply(chatId: string): () => void {
     const chat = requireItem(chatId);
     if (chat.kind !== 'chat') {
         throw new SurfaceError(`"${chatId}" is a ${chat.kind}, not a chat.`);
     }
-    chat.awaitingReply = awaiting;
+    return countReply(chat);
 }
 
 export function createDocument({
@@ -1774,6 +1795,7 @@ export function duplicateItem({
             id: newId('msg'),
         }));
         copy.awaitingReply = false;
+        copy.pendingReplies = 0;
     } else if (copy.kind === 'board') {
         copy.issues = copy.issues.map((issue) => ({
             ...issue,

@@ -26,6 +26,7 @@ import {
     linkItems,
     listItems,
     postMessage,
+    expectReply,
     resetSurface,
     SEED_SURFACE_ID,
     restackItem,
@@ -174,6 +175,40 @@ describe('surface store', () => {
         expect(['jordan', 'maya', 'dev']).toContain(
             answered.messages.at(-1)!.authorId,
         );
+    });
+
+    it('keeps flagging the wait until every reply on its way has landed', async () => {
+        vi.useFakeTimers();
+        const awaiting = () => {
+            const chat = getItem('chat-launch');
+            invariant(chat.kind === 'chat');
+            return chat.awaitingReply;
+        };
+        postMessage({ chatId: 'chat-launch', authorId: ALICE, text: 'One' });
+        await vi.advanceTimersByTimeAsync(MOCK_REPLY_DELAY_MS / 2);
+        postMessage({ chatId: 'chat-launch', authorId: ALICE, text: 'Two' });
+
+        // The first reply lands; the second is still coming.
+        await vi.advanceTimersByTimeAsync(MOCK_REPLY_DELAY_MS / 2);
+        expect(awaiting()).toBe(true);
+        await vi.advanceTimersByTimeAsync(MOCK_REPLY_DELAY_MS / 2);
+        expect(awaiting()).toBe(false);
+    });
+
+    it('counts each expected reply once, however often it is finished', () => {
+        const awaiting = () => {
+            const chat = getItem('chat-launch');
+            invariant(chat.kind === 'chat');
+            return chat.awaitingReply;
+        };
+        const first = expectReply('chat-launch');
+        const second = expectReply('chat-launch');
+        first();
+        first();
+        expect(awaiting()).toBe(true);
+        second();
+        expect(awaiting()).toBe(false);
+        expect(() => expectReply('doc-brief')).toThrow(/not a chat/);
     });
 
     it('never makes up a reply from a real person', async () => {

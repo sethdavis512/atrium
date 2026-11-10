@@ -40,6 +40,12 @@ export type ChatItem = {
     messages: ChatMessage[];
     /** Someone is "typing": a reply (the agent's, or the mock's) is on its way. */
     awaitingReply?: boolean;
+    /**
+     * How many replies are on their way (`expectReply`): `awaitingReply` is
+     * true while this is above zero, so one reply landing never hides another
+     * still coming.
+     */
+    pendingReplies?: number;
     createdById: string;
     /** Where someone resized it (`resizeItem`); unset, it rests at its kind's size. */
     size?: CardSize;

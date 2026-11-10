@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+    useEffect,
+    useRef,
+    useState,
+    type ReactNode,
+    type RefObject,
+} from 'react';
 import { useFetcher, useSubmit } from 'react-router';
 import {
     defineAnnotation,
@@ -199,15 +205,58 @@ const nodes = [
     }),
 ];
 
-type Props = {
-    doc: DocumentItem;
-};
-
 type SaveResult = {
     error: string | null;
     updatedAt?: string;
     conflict?: boolean;
 };
+
+/** A document's save fetcher, as the last render saw it. */
+type SaveState = {
+    saving: boolean;
+    data: SaveResult | undefined;
+    /** The card is gone: nothing will ever update this again. */
+    gone: boolean;
+};
+
+type Props = {
+    doc: DocumentItem;
+    /** From `useDocumentSaveState`, held by the card. */
+    saveState: RefObject<SaveState>;
+};
+
+function saveKey(documentId: string) {
+    return `save-doc:${documentId}`;
+}
+
+/**
+ * Where a document's saves stand, kept by its card (which stays on the
+ * canvas) rather than its editor (which closes with "Back to canvas"): a
+ * save still waiting when the editor closes can then see the one in flight
+ * finish, and build on the version it returned.
+ */
+export function useDocumentSaveState(documentId: string) {
+    const saver = useFetcher<SaveResult>({ key: saveKey(documentId) });
+    const state = useRef<SaveState>({
+        saving: false,
+        data: undefined,
+        gone: false,
+    });
+    useEffect(() => {
+        state.current = {
+            saving: saver.state !== 'idle',
+            data: saver.data,
+            gone: false,
+        };
+    });
+    useEffect(
+        () => () => {
+            state.current = { ...state.current, gone: true };
+        },
+        [],
+    );
+    return state;
+}
 
 /** The later of two ISO timestamps. */
 function later(a: string, b: string | undefined) {
@@ -221,11 +270,18 @@ function later(a: string, b: string | undefined) {
  * version it builds on; if someone (an agent) saved in between, the server
  * refuses and you choose: load theirs, or keep yours over it.
  */
-export function DocumentEditor({ doc }: Props) {
+export function DocumentEditor({ doc, saveState }: Props) {
     const links = useSurfaceLinks();
-    const fetcherKey = `save-doc:${doc.id}`;
+    const fetcherKey = saveKey(doc.id);
     const saver = useFetcher<SaveResult>({ key: fetcherKey });
     const submit = useSubmit();
+    // The card keeps the fetcher between visits: an answer from an earlier
+    // one (a conflict that came back after that editor closed, say) isn't
+    // this editor's to show or settle.
+    const [openedWith] = useState(saver.data);
+    const own = (result: SaveResult | undefined) =>
+        result === openedWith ? undefined : result;
+    const result = own(saver.data);
     // A new session (remounting the editor) when loading someone else's
     // changes; `startedFrom` is the version it opened at.
     const [session, setSession] = useState({
@@ -233,16 +289,18 @@ export function DocumentEditor({ doc }: Props) {
         startedFrom: doc.updatedAt,
     });
     const savedVersion =
-        saver.data && !saver.data.conflict ? saver.data.updatedAt : undefined;
+        result && !result.conflict ? result.updatedAt : undefined;
     const base = later(session.startedFrom, savedVersion);
-    const conflict = Boolean(saver.data?.conflict);
+    const conflict = Boolean(result?.conflict);
     const saving = saver.state !== 'idle';
 
     const pending = useRef<DocumentBlock[] | null>(null);
+    // What the editor holds, saved or not: what "Keep mine" keeps.
+    const value = useRef<DocumentBlock[]>(doc.blocks);
     const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-    const latest = useRef({ base, saving, conflict });
+    const startedFrom = useRef(session.startedFrom);
     useEffect(() => {
-        latest.current = { base, saving, conflict };
+        startedFrom.current = session.startedFrom;
     });
 
     function save(baseUpdatedAt: string) {
@@ -267,14 +325,19 @@ export function DocumentEditor({ doc }: Props) {
 
     function flush() {
         clearTimeout(timer.current);
-        const { base, saving, conflict } = latest.current;
-        if (conflict || !pending.current) return;
+        // The card's view of the fetcher, which stays current after this
+        // editor closes.
+        const { saving, gone } = saveState.current;
+        const data = own(saveState.current.data);
+        if (data?.conflict || !pending.current) return;
         // One save at a time: the next builds on the version this returns.
-        if (saving) {
+        // With the card gone nothing will say when, so send it now.
+        if (saving && !gone) {
             timer.current = setTimeout(flush, 200);
             return;
         }
-        save(base);
+        const saved = data && !data.conflict ? data.updatedAt : undefined;
+        save(later(startedFrom.current, saved));
     }
     const flushRef = useRef(flush);
     useEffect(() => {
@@ -284,8 +347,9 @@ export function DocumentEditor({ doc }: Props) {
     // Leaving the document (Back to canvas) saves what's left at once.
     useEffect(() => () => flushRef.current(), []);
 
-    function handleChange(value: PortableTextBlock[] | undefined) {
-        pending.current = (value ?? []) as DocumentBlock[];
+    function handleChange(next: PortableTextBlock[] | undefined) {
+        pending.current = (next ?? []) as DocumentBlock[];
+        value.current = pending.current;
         clearTimeout(timer.current);
         timer.current = setTimeout(flush, SAVE_DELAY_MS);
     }
@@ -296,6 +360,7 @@ export function DocumentEditor({ doc }: Props) {
 
     function loadLatest() {
         pending.current = null;
+        value.current = doc.blocks;
         clearTimeout(timer.current);
         saver.reset?.();
         setSession((current) => ({
@@ -305,6 +370,10 @@ export function DocumentEditor({ doc }: Props) {
     }
 
     function keepMine() {
+        clearTimeout(timer.current);
+        // The refused save already took what was pending; send the
+        // editor's text again, over theirs.
+        pending.current ??= value.current;
         save(doc.updatedAt);
     }
 
@@ -355,7 +424,7 @@ export function DocumentEditor({ doc }: Props) {
                     <Toolbar />
                     <SaveStatus
                         saving={saving || pending.current !== null}
-                        failed={Boolean(saver.data?.error) && !conflict}
+                        failed={Boolean(result?.error) && !conflict}
                     />
                 </div>
                 {(conflict || changedElsewhere) && (

@@ -4,6 +4,7 @@ import {
     createUIMessageStream,
     createUIMessageStreamResponse,
     generateId,
+    type InferUIMessageChunk,
 } from 'ai';
 import { data } from 'react-router';
 import { z } from 'zod';
@@ -24,11 +25,11 @@ import { authMiddleware } from '~/middleware/auth';
 import { markChanged } from '~/models/surface-events.server';
 import {
     SurfaceError,
+    expectReply,
     getItem,
     isMember,
     postMessage,
     rememberPerson,
-    setAwaitingReply,
 } from '~/models/surface.server';
 import type { Route } from './+types/api-agent-chat';
 
@@ -117,79 +118,90 @@ export async function action({ request, context }: Route.ActionArgs) {
         // The same message twice (a retry): answer it again, don't repeat it.
         if (!(error instanceof SurfaceError)) throw error;
     }
-    setAwaitingReply(chatId, true);
+    let stream: ReadableStream<InferUIMessageChunk<SurfaceAgentUIMessage>>;
+    const replied = expectReply(chatId);
     // Everyone else on the surface sees the message and the agent typing.
     markChanged();
 
-    const latest = getItem(chatId);
-    if (latest.kind !== 'chat') throw data('Not a chat', { status: 400 });
-    const history = chatHistory(latest);
-    // The model's turns start with the user: drop the agent's greeting.
-    while (history[0]?.role === 'assistant') history.shift();
+    try {
+        const latest = getItem(chatId);
+        if (latest.kind !== 'chat') throw data('Not a chat', { status: 400 });
+        const history = chatHistory(latest);
+        // The model's turns start with the user: drop the agent's greeting.
+        while (history[0]?.role === 'assistant') history.shift();
 
-    const memory = await getWorkspaceMemory();
-    const result = await createSurfaceAgent(latest, memory).stream(history, {
-        // Mastra keeps no messages (they're the chat's); the thread is only
-        // where working memory is read and written, for the workspace.
-        ...(memory && {
-            memory: { thread: chatId, resource: WORKSPACE_RESOURCE_ID },
-        }),
-        abortSignal: AbortSignal.any([
-            request.signal,
-            AbortSignal.timeout(TURN_TIMEOUT_MS),
-        ]),
-    });
+        const memory = await getWorkspaceMemory();
+        const result = await createSurfaceAgent(latest, memory).stream(
+            history,
+            {
+                // Mastra keeps no messages (they're the chat's); the thread is only
+                // where working memory is read and written, for the workspace.
+                ...(memory && {
+                    memory: { thread: chatId, resource: WORKSPACE_RESOURCE_ID },
+                }),
+                abortSignal: AbortSignal.any([
+                    request.signal,
+                    AbortSignal.timeout(TURN_TIMEOUT_MS),
+                ]),
+            },
+        );
 
-    const stream = createUIMessageStream<SurfaceAgentUIMessage>({
-        execute: ({ writer }) => {
-            writer.merge(
-                toAISdkStream(result, {
-                    from: 'agent',
-                    version: 'v6',
-                }).pipeThrough(
-                    new TransformStream({
-                        transform(chunk, controller) {
-                            controller.enqueue(
-                                chunk.type === 'tool-output-error'
-                                    ? {
-                                          ...chunk,
-                                          errorText: readableToolError(
-                                              chunk.errorText,
-                                          ),
-                                      }
-                                    : chunk,
-                            );
-                        },
-                    }),
-                ),
-            );
-        },
-        generateId,
-        onError: (error) => {
-            log.exception('agent_chat_failed', error, { chatId });
-            return 'The agent ran into a problem. Try again.';
-        },
-        onFinish: ({ responseMessage }) => {
-            try {
-                setAwaitingReply(chatId, false);
-                markChanged();
-                const said = responseMessage.parts.some(
-                    (part) => part.type !== 'step-start',
+        stream = createUIMessageStream<SurfaceAgentUIMessage>({
+            execute: ({ writer }) => {
+                writer.merge(
+                    toAISdkStream(result, {
+                        from: 'agent',
+                        version: 'v6',
+                    }).pipeThrough(
+                        new TransformStream({
+                            transform(chunk, controller) {
+                                controller.enqueue(
+                                    chunk.type === 'tool-output-error'
+                                        ? {
+                                              ...chunk,
+                                              errorText: readableToolError(
+                                                  chunk.errorText,
+                                              ),
+                                          }
+                                        : chunk,
+                                );
+                            },
+                        }),
+                    ),
                 );
-                if (!said) return;
-                postMessage({
-                    chatId,
-                    authorId: AGENT_ID,
-                    text: replyText(responseMessage),
-                    id: responseMessage.id,
-                    parts: responseMessage.parts,
-                });
-            } catch (error) {
-                // The chat was deleted mid-turn: nowhere to save the reply.
-                if (!(error instanceof SurfaceError)) throw error;
-            }
-        },
-    });
+            },
+            generateId,
+            onError: (error) => {
+                log.exception('agent_chat_failed', error, { chatId });
+                return 'The agent ran into a problem. Try again.';
+            },
+            onFinish: ({ responseMessage }) => {
+                try {
+                    replied();
+                    markChanged();
+                    const said = responseMessage.parts.some(
+                        (part) => part.type !== 'step-start',
+                    );
+                    if (!said) return;
+                    postMessage({
+                        chatId,
+                        authorId: AGENT_ID,
+                        text: replyText(responseMessage),
+                        id: responseMessage.id,
+                        parts: responseMessage.parts,
+                    });
+                } catch (error) {
+                    // The chat was deleted mid-turn: nowhere to save the reply.
+                    if (!(error instanceof SurfaceError)) throw error;
+                }
+            },
+        });
+    } catch (error) {
+        // The turn never started (memory, the model): nobody is typing.
+        replied();
+        markChanged();
+        throw error;
+    }
     // Drain on the server, so onFinish runs even when the stream is cut.
     return createUIMessageStreamResponse({
         stream,
