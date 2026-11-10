@@ -106,7 +106,7 @@ bun run db:seed             # seed demo users
 bun run dev
 ```
 
-Seeded users (all password `password123`): `alice@iridium.test`, `bob@iridium.test`, `admin@iridium.test` (ADMIN). The domain is `DEMO_EMAIL_DOMAIN` (`<slug>.test`, a reserved TLD) in `app/config.ts`.
+Seeded users (all password `password123`): `alice@atrium.test`, `bob@atrium.test`, `admin@atrium.test` (ADMIN). The domain is `DEMO_EMAIL_DOMAIN` (`<slug>.test`, a reserved TLD) in `app/config.ts`.
 
 App identity lives in `app/config.ts`: `APP_NAME`/`APP_TAGLINE` for display, and `APP_SLUG`, which namespaces the theme cookie, Better Auth's cookie prefix (`AUTH_COOKIE_PREFIX`, which keeps the default `better-auth` for the original `iridium` slug so production sessions survive), the local database name, the Compose project, and the demo email domain. `bun run setup` (`tools/init.ts`, pure helpers in `tools/identity.ts`) rewrites them for a copy, including `docker-compose.dev.yml`, `prisma.config.ts`, and `.env.example`, which can't import the config; `tools/identity.test.ts` fails if those drift from `APP_SLUG`. Setup also checks the database host ports: when another project holds 5432/5433 it picks a free pair (`tools/ports.ts`; asks first, automatic with `--non-interactive`) and writes `POSTGRES_PORT`/`MASTRA_POSTGRES_PORT` plus the matching URLs to `.env`.
 
@@ -114,10 +114,10 @@ App identity lives in `app/config.ts`: `APP_NAME`/`APP_TAGLINE` for display, and
 
 The app runs two PostgreSQL instances via `docker-compose.dev.yml`:
 
-| Database  | Port | Env Var               | Purpose                          |
-| --------- | ---- | --------------------- | -------------------------------- |
-| `iridium` | 5432 | `DATABASE_URL`        | Prisma (app data, auth, threads) |
-| `mastra`  | 5433 | `MASTRA_DATABASE_URL` | Mastra memory and state          |
+| Database | Port | Env Var               | Purpose                          |
+| -------- | ---- | --------------------- | -------------------------------- |
+| `atrium` | 5432 | `DATABASE_URL`        | Prisma (app data, auth, threads) |
+| `mastra` | 5433 | `MASTRA_DATABASE_URL` | Mastra memory and state          |
 
 Mastra creates its own `mastra_*` tables automatically on first connection -- no migration needed. It does so the first time chat uses memory, in whatever database `MASTRA_DATABASE_URL` names, so env validation refuses a `MASTRA_DATABASE_URL` that resolves to the same database as `DATABASE_URL` (in dev too).
 

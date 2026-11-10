@@ -90,7 +90,7 @@ bun install
 Copy `.env.example` to `.env` and fill in:
 
 ```
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/iridium"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/atrium"
 MASTRA_DATABASE_URL="postgresql://postgres:postgres@localhost:5433/mastra"
 # Host ports for docker-compose.dev.yml; keep the URLs above on the same ports
 POSTGRES_PORT="5432"
@@ -118,10 +118,10 @@ ADMIN_EMAILS="you@example.com"
 
 The app runs two PostgreSQL instances via `docker-compose.dev.yml`:
 
-| Database  | Port | Env Var               | Purpose                          |
-| --------- | ---- | --------------------- | -------------------------------- |
-| `iridium` | 5432 | `DATABASE_URL`        | Prisma (app data, auth, threads) |
-| `mastra`  | 5433 | `MASTRA_DATABASE_URL` | Mastra memory and state          |
+| Database | Port | Env Var               | Purpose                          |
+| -------- | ---- | --------------------- | -------------------------------- |
+| `atrium` | 5432 | `DATABASE_URL`        | Prisma (app data, auth, threads) |
+| `mastra` | 5433 | `MASTRA_DATABASE_URL` | Mastra memory and state          |
 
 Mastra creates its own tables automatically on first connection -- no migration needed.
 
@@ -144,8 +144,8 @@ bun run db:migrate              # Apply migrations
 bun run db:seed                 # Seed with demo users
 ```
 
-Seeded demo users (password `password123` for all): `alice@iridium.test`,
-`bob@iridium.test`, and `admin@iridium.test` (ADMIN role). Their domain is
+Seeded demo users (password `password123` for all): `alice@atrium.test`,
+`bob@atrium.test`, and `admin@atrium.test` (ADMIN role). Their domain is
 `<slug>.test` (`DEMO_EMAIL_DOMAIN` in `app/config.ts`), a reserved TLD, so
 verification and reset emails to them never reach a real inbox. Because those
 passwords are public, the seed refuses to run when `NODE_ENV=production` or
@@ -323,8 +323,8 @@ bun run build
 ### Docker
 
 ```bash
-docker build -t iridium .
-docker run -p 3000:3000 iridium
+docker build -t atrium .
+docker run -p 3000:3000 atrium
 ```
 
 The image's default command applies pending Prisma migrations

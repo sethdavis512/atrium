@@ -50,7 +50,7 @@ function withTimeout<T>(check: () => Promise<T>, ms: number): Promise<T> {
 
 export async function loader() {
     const checks = {
-        iridium: () => prisma.$queryRaw`SELECT 1`,
+        app: () => prisma.$queryRaw`SELECT 1`,
         mastra: () => getMastraPool().query('SELECT 1'),
     };
 
