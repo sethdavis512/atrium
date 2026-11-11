@@ -441,7 +441,7 @@ export function BoardWindow({ data, selected }: NodeProps<BoardNode>) {
     return (
         <div className="group/window relative size-full">
             <Handle type="source" position="top" />
-            <LinkHandle />
+            <LinkHandle radius={12} />
             <WindowControls
                 itemId={board.id}
                 title={board.title}

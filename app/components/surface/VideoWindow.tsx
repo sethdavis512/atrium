@@ -27,7 +27,7 @@ export function VideoWindow({ data, selected }: NodeProps<VideoNode>) {
     return (
         <div className="group/window relative size-full">
             <Handle type="target" position="top" />
-            <LinkHandle />
+            <LinkHandle radius={12} />
             <WindowControls
                 itemId={item.id}
                 title={item.title}

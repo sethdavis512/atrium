@@ -194,7 +194,7 @@ export function UiWindow({ data, selected }: NodeProps<UiNode>) {
     return (
         <div className="group/window relative size-full">
             <Handle type="target" position="top" />
-            <LinkHandle />
+            <LinkHandle radius={16} />
             <WindowControls
                 itemId={item.id}
                 title={item.title}

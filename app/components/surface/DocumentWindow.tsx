@@ -31,7 +31,7 @@ export function DocumentWindow({ data, selected }: NodeProps<DocumentNode>) {
     return (
         <div className="group/window relative size-full">
             <Handle type="target" position="top" />
-            <LinkHandle />
+            <LinkHandle radius={12} />
             {/* Charts hang below their document. */}
             <Handle id="bottom" type="source" position="bottom" />
             <WindowControls

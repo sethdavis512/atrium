@@ -30,7 +30,7 @@ export function ImageWindow({ data, selected }: NodeProps<ImageNode>) {
     return (
         <div className="group/window relative size-full">
             <Handle type="target" position="top" />
-            <LinkHandle />
+            <LinkHandle radius={12} />
             <WindowControls
                 itemId={item.id}
                 title={item.title}

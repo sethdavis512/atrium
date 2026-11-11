@@ -59,7 +59,7 @@ export function WebWindow({ data, selected }: NodeProps<WebNode>) {
     return (
         <div className="group/window relative size-full">
             <Handle type="target" position="top" />
-            <LinkHandle />
+            <LinkHandle radius={12} />
             <WindowControls
                 itemId={item.id}
                 title={item.title}

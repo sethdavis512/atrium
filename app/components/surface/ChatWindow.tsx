@@ -72,7 +72,7 @@ export function ChatWindow({ data, selected }: NodeProps<ChatNode>) {
     return (
         <div className="group/window relative size-full">
             <Handle type="source" position="top" />
-            <LinkHandle inside={0} />
+            <LinkHandle inside={0} radius={32} />
             <ResizeEdges itemId={chat.id} title={chat.title} kind="chat" />
             {/* Pull requests hang below their chat. */}
             <Handle id="bottom" type="source" position="bottom" />

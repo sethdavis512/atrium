@@ -90,7 +90,7 @@ export function PullRequestWindow({
     return (
         <div className="group/window relative size-full">
             <Handle type="target" position="top" />
-            <LinkHandle />
+            <LinkHandle radius={16} />
             <WindowControls
                 itemId={pr.id}
                 title={`#${pr.number}`}

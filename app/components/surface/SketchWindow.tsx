@@ -166,7 +166,7 @@ export function SketchWindow({ data, selected }: NodeProps<SketchNode>) {
     return (
         <div className="group/window relative size-full">
             <Handle type="target" position="top" />
-            <LinkHandle />
+            <LinkHandle radius={12} />
             <WindowControls
                 itemId={sketch.id}
                 title={sketch.title}

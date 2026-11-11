@@ -107,7 +107,7 @@ export function ChartWindow({ data, selected }: NodeProps<ChartNode>) {
     return (
         <div className="group/window relative size-full">
             <Handle type="target" position="top" />
-            <LinkHandle />
+            <LinkHandle radius={16} />
             <WindowControls
                 itemId={item.id}
                 title={item.title}

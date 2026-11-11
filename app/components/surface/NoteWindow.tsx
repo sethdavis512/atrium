@@ -49,7 +49,7 @@ export function NoteWindow({ data, selected }: NodeProps<NoteNode>) {
     return (
         <div className="group/window relative size-full">
             <Handle type="target" position="top" />
-            <LinkHandle />
+            <LinkHandle radius={6} />
             <WindowControls
                 itemId={note.id}
                 title={note.title}
