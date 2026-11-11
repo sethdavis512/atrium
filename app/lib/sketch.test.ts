@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SketchStroke } from './surface';
+import type { SketchStroke } from './room';
 import {
     SKETCH_PAPER,
     clampPoint,

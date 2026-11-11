@@ -10,27 +10,27 @@ import { data } from 'react-router';
 import { z } from 'zod';
 import {
     chatHistory,
-    createSurfaceAgent,
+    createConcierge,
     readableToolError,
     replyText,
-    type SurfaceAgentUIMessage,
-} from '~/agent/surface-agent.server';
+    type ConciergeUIMessage,
+} from '~/agent/concierge.server';
 import { requireUserFromContext } from '~/context';
 import { env } from '~/lib/env.server';
 import { log } from '~/lib/logger.server';
 import { WORKSPACE_RESOURCE_ID, getWorkspaceMemory } from '~/mastra';
 import { slideWindow } from '~/lib/rate-limit.server';
-import { AGENT_ID, isAgentChat } from '~/lib/surface';
+import { AGENT_ID, isAgentChat } from '~/lib/room';
 import { authMiddleware } from '~/middleware/auth';
-import { markChanged } from '~/models/surface-events.server';
+import { markChanged } from '~/models/room-events.server';
 import {
-    SurfaceError,
+    RoomError,
     expectReply,
-    getItem,
+    getCard,
     isMember,
     postMessage,
     rememberPerson,
-} from '~/models/surface.server';
+} from '~/models/room.server';
 import type { Route } from './+types/api-agent-chat';
 
 /**
@@ -51,7 +51,7 @@ const bodySchema = z.object({
 });
 
 /**
- * Turns per person per minute. Counted in memory, like the surface store
+ * Turns per person per minute. Counted in memory, like the room store
  * these chats live in (it needs no database).
  */
 const TURNS_PER_MINUTE = 20;
@@ -93,9 +93,9 @@ export async function action({ request, context }: Route.ActionArgs) {
 
     let chat;
     try {
-        chat = getItem(chatId);
+        chat = getCard(chatId);
     } catch (error) {
-        if (error instanceof SurfaceError) {
+        if (error instanceof RoomError) {
             throw data(error.message, { status: 404 });
         }
         throw error;
@@ -116,37 +116,34 @@ export async function action({ request, context }: Route.ActionArgs) {
         });
     } catch (error) {
         // The same message twice (a retry): answer it again, don't repeat it.
-        if (!(error instanceof SurfaceError)) throw error;
+        if (!(error instanceof RoomError)) throw error;
     }
-    let stream: ReadableStream<InferUIMessageChunk<SurfaceAgentUIMessage>>;
+    let stream: ReadableStream<InferUIMessageChunk<ConciergeUIMessage>>;
     const replied = expectReply(chatId);
-    // Everyone else on the surface sees the message and the agent typing.
+    // Everyone else in the room sees the message and the agent typing.
     markChanged();
 
     try {
-        const latest = getItem(chatId);
+        const latest = getCard(chatId);
         if (latest.kind !== 'chat') throw data('Not a chat', { status: 400 });
         const history = chatHistory(latest);
         // The model's turns start with the user: drop the agent's greeting.
         while (history[0]?.role === 'assistant') history.shift();
 
         const memory = await getWorkspaceMemory();
-        const result = await createSurfaceAgent(latest, memory).stream(
-            history,
-            {
-                // Mastra keeps no messages (they're the chat's); the thread is only
-                // where working memory is read and written, for the workspace.
-                ...(memory && {
-                    memory: { thread: chatId, resource: WORKSPACE_RESOURCE_ID },
-                }),
-                abortSignal: AbortSignal.any([
-                    request.signal,
-                    AbortSignal.timeout(TURN_TIMEOUT_MS),
-                ]),
-            },
-        );
+        const result = await createConcierge(latest, memory).stream(history, {
+            // Mastra keeps no messages (they're the chat's); the thread is only
+            // where working memory is read and written, for the workspace.
+            ...(memory && {
+                memory: { thread: chatId, resource: WORKSPACE_RESOURCE_ID },
+            }),
+            abortSignal: AbortSignal.any([
+                request.signal,
+                AbortSignal.timeout(TURN_TIMEOUT_MS),
+            ]),
+        });
 
-        stream = createUIMessageStream<SurfaceAgentUIMessage>({
+        stream = createUIMessageStream<ConciergeUIMessage>({
             execute: ({ writer }) => {
                 writer.merge(
                     toAISdkStream(result, {
@@ -192,7 +189,7 @@ export async function action({ request, context }: Route.ActionArgs) {
                     });
                 } catch (error) {
                     // The chat was deleted mid-turn: nowhere to save the reply.
-                    if (!(error instanceof SurfaceError)) throw error;
+                    if (!(error instanceof RoomError)) throw error;
                 }
             },
         });

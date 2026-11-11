@@ -1,17 +1,17 @@
 import {
-    WINDOW_GAP,
+    CARD_GAP,
     hangingUnder,
     parentIdOf,
-    placeWindows,
+    placeCards,
     sizeOf,
     type Relation,
-    type SurfaceItem,
-    type SurfaceItemKind,
-    type WindowPlacement,
-} from './surface';
+    type Card,
+    type CardKind,
+    type CardPlacement,
+} from './room';
 
 /**
- * Laying cards out on purpose (agents arranging a surface): pure geometry,
+ * Laying cards out on purpose (agents arranging a room): pure geometry,
  * client-safe, so the store and tests share it.
  */
 
@@ -22,17 +22,17 @@ export const ARRANGE_DIRECTIONS = ['columns', 'rows'] as const;
 export type ArrangeDirection = (typeof ARRANGE_DIRECTIONS)[number];
 
 /** Between groups: wide enough that each reads as its own cluster. */
-export const GROUP_GAP = WINDOW_GAP * 3;
+export const GROUP_GAP = CARD_GAP * 3;
 
 /**
  * Where every card is now, as a fresh load draws it: its saved spot, else
- * the tidy layout's (`placeWindows`).
+ * the tidy layout's (`placeCards`).
  */
 export function currentLayout(
-    items: SurfaceItem[],
+    cards: Card[],
     positions: Partial<Record<string, Spot>>,
-): WindowPlacement[] {
-    return placeWindows(items).map((spot) => ({
+): CardPlacement[] {
+    return placeCards(cards).map((spot) => ({
         ...spot,
         ...(positions[spot.id] ?? {}),
     }));
@@ -47,22 +47,22 @@ type Block = {
 };
 
 /** A card with everything hanging under it stacked below, as one block. */
-function blockOf(item: SurfaceItem, items: SurfaceItem[]): Block {
-    const byId = new Map(items.map((candidate) => [candidate.id, candidate]));
+function blockOf(card: Card, cards: Card[]): Block {
+    const byId = new Map(cards.map((candidate) => [candidate.id, candidate]));
     const stack = [
-        item,
-        ...hangingUnder(item.id, items).map((id) => byId.get(id)!),
+        card,
+        ...hangingUnder(card.id, cards).map((id) => byId.get(id)!),
     ];
     let dy = 0;
     const members = stack.map((member) => {
         const placed = { id: member.id, dx: 0, dy };
-        dy += sizeOf(member).height + WINDOW_GAP;
+        dy += sizeOf(member).height + CARD_GAP;
         return placed;
     });
     return {
-        id: item.id,
+        id: card.id,
         width: Math.max(...stack.map((member) => sizeOf(member).width)),
-        height: dy - WINDOW_GAP,
+        height: dy - CARD_GAP,
         members,
     };
 }
@@ -86,12 +86,12 @@ export type ArrangeResult = {
  * nothing is left underneath the new layout.
  */
 export function arrangeGroups(
-    items: SurfaceItem[],
+    cards: Card[],
     groups: readonly (readonly string[])[],
     {
         direction,
         origin,
-        gap = WINDOW_GAP,
+        gap = CARD_GAP,
         locked = new Set<string>(),
         rest = 'append',
     }: {
@@ -102,9 +102,9 @@ export function arrangeGroups(
         rest?: 'append' | 'leave';
     },
 ): ArrangeResult {
-    const byId = new Map(items.map((item) => [item.id, item]));
-    const hangs = (item: SurfaceItem) => {
-        const parentId = parentIdOf(item);
+    const byId = new Map(cards.map((card) => [card.id, card]));
+    const hangs = (card: Card) => {
+        const parentId = parentIdOf(card);
         return parentId !== undefined && byId.has(parentId);
     };
     const skipped: ArrangeResult['skipped'] = [];
@@ -112,13 +112,13 @@ export function arrangeGroups(
 
     const pick = (ids: readonly string[]) =>
         ids.flatMap((id) => {
-            const item = byId.get(id);
-            if (!item || seen.has(id)) return [];
+            const card = byId.get(id);
+            if (!card || seen.has(id)) return [];
             seen.add(id);
-            if (hangs(item)) {
+            if (hangs(card)) {
                 skipped.push({
                     id,
-                    reason: `hangs under ${parentIdOf(item)} and moves with it`,
+                    reason: `hangs under ${parentIdOf(card)} and moves with it`,
                 });
                 return [];
             }
@@ -126,14 +126,14 @@ export function arrangeGroups(
                 skipped.push({ id, reason: 'locked in place' });
                 return [];
             }
-            return [item];
+            return [card];
         });
 
     const named = groups.map(pick).filter((group) => group.length > 0);
     if (rest === 'append') {
-        const left = items.filter(
-            (item) =>
-                !seen.has(item.id) && !hangs(item) && !locked.has(item.id),
+        const left = cards.filter(
+            (card) =>
+                !seen.has(card.id) && !hangs(card) && !locked.has(card.id),
         );
         if (left.length > 0) named.push(left);
     }
@@ -148,7 +148,7 @@ export function arrangeGroups(
 
     let cursor = { ...origin };
     for (const group of named) {
-        const blocks = group.map((item) => blockOf(item, items));
+        const blocks = group.map((card) => blockOf(card, cards));
         let along = 0;
         let across = 0;
         for (const block of blocks) {
@@ -178,7 +178,7 @@ export function arrangeGroups(
 const PACK_ASPECT = 16 / 9;
 
 /** Which card a cluster centers on when link counts tie. */
-const HUB_RANK: Partial<Record<SurfaceItemKind, number>> = {
+const HUB_RANK: Partial<Record<CardKind, number>> = {
     chat: 0,
     document: 1,
     board: 2,
@@ -252,26 +252,26 @@ function clusterOf(blocks: Block[], hubId: string | null, gap: number) {
  * together. Returns a spot for every card that moves.
  */
 export function clusterLayout(
-    items: SurfaceItem[],
+    cards: Card[],
     relations: readonly Relation[],
     {
         locked = new Set<string>(),
-        gap = WINDOW_GAP,
+        gap = CARD_GAP,
     }: { locked?: ReadonlySet<string>; gap?: number } = {},
 ): Record<string, Spot> {
-    const byId = new Map(items.map((item) => [item.id, item]));
+    const byId = new Map(cards.map((card) => [card.id, card]));
     const topOf = (id: string) => {
         const parentId = parentIdOf(byId.get(id)!);
         return parentId !== undefined && byId.has(parentId) ? parentId : id;
     };
-    const tops = items.filter(
-        (item) => topOf(item.id) === item.id && !locked.has(item.id),
+    const tops = cards.filter(
+        (card) => topOf(card.id) === card.id && !locked.has(card.id),
     );
-    const order = new Map(tops.map((item, index) => [item.id, index]));
+    const order = new Map(tops.map((card, index) => [card.id, index]));
 
     // Links between top cards (a link to a hanging card counts for its
     // parent), each pair once.
-    const neighbors = new Map(tops.map((item) => [item.id, new Set<string>()]));
+    const neighbors = new Map(tops.map((card) => [card.id, new Set<string>()]));
     for (const { from, to } of relations) {
         if (!byId.has(from) || !byId.has(to)) continue;
         const a = topOf(from);
@@ -282,13 +282,13 @@ export function clusterLayout(
     }
 
     // Connected clusters, each in the order a walk from its hub meets them.
-    const hubFirst = (a: SurfaceItem, b: SurfaceItem) =>
+    const hubFirst = (a: Card, b: Card) =>
         neighbors.get(b.id)!.size - neighbors.get(a.id)!.size ||
         (HUB_RANK[a.kind] ?? 9) - (HUB_RANK[b.kind] ?? 9) ||
         order.get(a.id)! - order.get(b.id)!;
     const seen = new Set<string>();
     const linked: { hubId: string; ids: string[] }[] = [];
-    const loose: SurfaceItem[] = [];
+    const loose: Card[] = [];
     for (const start of tops) {
         if (seen.has(start.id)) continue;
         if (neighbors.get(start.id)!.size === 0) {
@@ -296,7 +296,7 @@ export function clusterLayout(
             loose.push(start);
             continue;
         }
-        const component: SurfaceItem[] = [];
+        const component: Card[] = [];
         const queue = [start.id];
         seen.add(start.id);
         while (queue.length > 0) {
@@ -328,7 +328,7 @@ export function clusterLayout(
     const tallestFirst = (a: Block, b: Block) => b.height - a.height;
     const clusters: Cluster[] = linked
         .map(({ hubId, ids }) => {
-            const blocks = ids.map((id) => blockOf(byId.get(id)!, items));
+            const blocks = ids.map((id) => blockOf(byId.get(id)!, cards));
             const [hub, ...rest] = blocks;
             return clusterOf([hub!, ...rest.sort(tallestFirst)], hubId, gap);
         })
@@ -341,7 +341,7 @@ export function clusterLayout(
         );
         clusters.push(
             clusterOf(
-                kindFirst.map((item) => blockOf(item, items)),
+                kindFirst.map((card) => blockOf(card, cards)),
                 null,
                 gap,
             ),

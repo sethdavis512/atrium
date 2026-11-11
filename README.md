@@ -1,12 +1,12 @@
 # Atrium
 
-One place for every kind of company information and how it relates. Today that is a canvas of windows (phone-sized chats and 16:9 documents, joined by their relations) built on [Trellis](https://github.com/sethdavis512/trellis), with mock data and a mock chat service. Slides, sites, and more come later.
+One place for every kind of company information and how it relates. Today that is a canvas of cards (phone-sized chats and 16:9 documents, joined by their relations) built on [Trellis](https://github.com/sethdavis512/trellis), with mock data and a mock chat service. Slides, sites, and more come later.
 
 It started as a copy of the Iridium template. The sections below still describe that template; the chat, notes, dashboard, settings, and admin routes they mention are gone (see Routes), while their libraries remain in the repo, unused.
 
 ## Connect an agent (MCP)
 
-Agents can work in a room through MCP at `/api/mcp` (Streamable HTTP). Tools: `list_spaces`, `create_space`, `create_room`, `list_cards`, `search`, `get_card`, `list_people`, `create_chat`, `post_message`, `create_document`, `append_to_document`, `link_cards`, `create_chart`, `duplicate_card`, `add_video`, `add_image`, `add_note`, `update_note`, `add_sketch`, `add_web_page`, `navigate_web_page`, `create_board`, `create_issue`, `update_issue` (status, priority, title, description, assignee), `comment_on_issue`, `open_pull_request`, `set_pull_request_status`, `list_views`, `save_view`, `delete_view`, `set_card_color`, `restack_card`, `rename_card`, `lock_card`, `unlink_cards`, `add_shape`, `update_shape`, and `delete_card`. Whatever an agent creates or changes shows up on open canvases within a couple of seconds. `save_view` can frame items by id: each person's canvas then fits those windows wherever they are, at its own size. People edit documents in place when they focus one (type `@` to link an item, `/` for headings, lists, and item cards); agents write and read them as Markdown; `[text](item:<id>)` links a phrase to another item and a line of `![](item:<id>)` embeds a card for it (they are stored as Portable Text).
+Agents can work in a room through MCP at `/api/mcp` (Streamable HTTP). Tools: `list_spaces`, `create_space`, `create_room`, `list_cards`, `search`, `get_card`, `list_people`, `create_chat`, `post_message`, `create_document`, `append_to_document`, `link_cards`, `create_chart`, `duplicate_card`, `add_video`, `add_image`, `add_note`, `update_note`, `add_sketch`, `add_web_page`, `navigate_web_page`, `create_board`, `create_issue`, `update_issue` (status, priority, title, description, assignee), `comment_on_issue`, `open_pull_request`, `set_pull_request_status`, `list_views`, `save_view`, `delete_view`, `set_card_color`, `restack_card`, `rename_card`, `lock_card`, `unlink_cards`, `add_shape`, `update_shape`, and `delete_card`. Whatever an agent creates or changes shows up on open canvases within a couple of seconds. `save_view` can frame cards by id: each person's canvas then fits those cards wherever they are, at its own size. People edit documents in place when they focus one (type `@` to link a card, `/` for headings, lists, and card cards); agents write and read them as Markdown; `[text](card:<id>)` links a phrase to another card and a line of `![](card:<id>)` embeds a card for it (they are stored as Portable Text).
 
 With the dev server running, this repo's `.mcp.json` points Claude Code at it (approve the server when asked). To add it anywhere else:
 
@@ -173,7 +173,7 @@ The app will be available at `http://localhost:5173`.
 bun run test          # Vitest unit tests
 bun run test:e2e      # Playwright E2E suite on Chromium, as CI (port 7778)
 bun run test:e2e:cross # Same suite on Chromium, Firefox and WebKit
-bun run test:visual   # Visual inventory: screenshot gallery of every surface
+bun run test:visual   # Visual inventory: screenshot gallery of every room
 ```
 
 The visual inventory writes PNGs to `test-results/visual-inventory/` and
@@ -390,19 +390,19 @@ Google Cloud Run, …).
 
 ## Routes
 
-| Route                                | Description                                |
-| ------------------------------------ | ------------------------------------------ |
-| `/`                                  | Spaces and their surfaces (signed in only) |
-| `/surfaces/:surfaceId`               | One surface's canvas of cards              |
-| `/surfaces/:surfaceId/cards/:itemId` | The canvas, focused on one card            |
-| `/surfaces/:surfaceId/views/:viewId` | The canvas at a saved view                 |
-| `/api/mcp`                           | MCP endpoint for agents (see below)        |
-| `/login`                             | Sign in or create an account               |
-| `/forgot-password`                   | Request a password reset email             |
-| `/reset-password`                    | Choose a new password from an emailed link |
-| `/api/auth/*`                        | Auth API endpoints                         |
-| `/api/theme`                         | Theme cookie endpoint                      |
-| `/healthcheck`                       | Health status                              |
+| Route                          | Description                                |
+| ------------------------------ | ------------------------------------------ |
+| `/`                            | Spaces and their rooms (signed in only)    |
+| `/rooms/:roomId`               | One room's canvas of cards                 |
+| `/rooms/:roomId/cards/:cardId` | The canvas, focused on one card            |
+| `/rooms/:roomId/views/:viewId` | The canvas at a saved view                 |
+| `/api/mcp`                     | MCP endpoint for agents (see below)        |
+| `/login`                       | Sign in or create an account               |
+| `/forgot-password`             | Request a password reset email             |
+| `/reset-password`              | Choose a new password from an emailed link |
+| `/api/auth/*`                  | Auth API endpoints                         |
+| `/api/theme`                   | Theme cookie endpoint                      |
+| `/healthcheck`                 | Health status                              |
 
 ## Optional Agent Tooling
 

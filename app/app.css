@@ -135,9 +135,9 @@
     --background: var(--color-white);
     --border: --alpha(var(--color-black) / 8%);
     --card: var(--color-white);
-    /* The surface canvas: a step darker than cards so windows stand out. */
+    /* The room canvas: a step darker than cards so cards stand out. */
     --canvas: var(--color-neutral-100);
-    /* Window border colors people pick per window (WindowControls). */
+    /* Card border colors people pick per window (CardControls). */
     --tint-rose: oklch(0.645 0.2 16);
     --tint-amber: oklch(0.75 0.16 70);
     --tint-emerald: oklch(0.65 0.15 160);
@@ -223,7 +223,7 @@
     --warning-foreground: var(--color-amber-400);
 }
 
-/* A card that arrives while the surface is open fades and grows in. It
+/* A card that arrives while the room is open fades and grows in. It
    animates `scale` (not `transform`, which places the card on the canvas)
    and `opacity` (not `transition`, which the canvas uses for other moves). */
 @keyframes card-in {

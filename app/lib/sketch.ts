@@ -1,6 +1,6 @@
 import { getStroke, type StrokeOptions } from 'perfect-freehand';
 import { z } from 'zod';
-import { SKETCH_COLORS, SKETCH_SIZE, type SketchStroke } from './surface';
+import { SKETCH_COLORS, SKETCH_SIZE, type SketchStroke } from './room';
 
 /** The brush widths a sketch offers, in sketch units. */
 export const SKETCH_BRUSHES = [3, 6, 14] as const;

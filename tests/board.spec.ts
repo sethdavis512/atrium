@@ -1,9 +1,9 @@
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, waitForHydration, createFreshUser } from './fixtures';
 
-/** The seeded surface every card here is on. */
-const SURFACE_ID = 'atlas-launch';
-const SURFACE = `/surfaces/${SURFACE_ID}`;
+/** The seeded room every card here is on. */
+const ROOM_ID = 'atlas-launch';
+const ROOM = `/rooms/${ROOM_ID}`;
 
 /**
  * Issue boards. The tests share one board they make over MCP (one extra
@@ -36,7 +36,7 @@ let shared: { id: string; title: string } | null = null;
 async function boardWith(page: Page, titles: string[]) {
     if (!shared) {
         const board = await mcp(page, 'create_board', {
-            surfaceId: SURFACE_ID,
+            roomId: ROOM_ID,
             title: `E2E board ${crypto.randomUUID().slice(0, 8)}`,
             key: 'EB',
         });
@@ -54,11 +54,11 @@ async function boardWith(page: Page, titles: string[]) {
 }
 
 /** Waits until the board stops moving (the canvas flies and resizes it). */
-async function settled(window: Locator) {
-    let last = JSON.stringify(await window.boundingBox());
+async function settled(card: Locator) {
+    let last = JSON.stringify(await card.boundingBox());
     for (let attempt = 0; attempt < 20; attempt++) {
-        await window.page().waitForTimeout(250);
-        const next = JSON.stringify(await window.boundingBox());
+        await card.page().waitForTimeout(250);
+        const next = JSON.stringify(await card.boundingBox());
         if (next === last) return;
         last = next;
     }
@@ -71,17 +71,17 @@ async function press(page: Page, key: string) {
     await page.waitForTimeout(250);
 }
 
-function boardWindow(page: Page, title: string) {
+function boardCard(page: Page, title: string) {
     return page.getByRole('article', { name: `Board: ${title}` });
 }
 
-function column(window: Locator, name: string) {
-    return window.getByRole('region', { name, exact: true });
+function column(card: Locator, name: string) {
+    return card.getByRole('region', { name, exact: true });
 }
 
 /** A test's own issues in a column, top to bottom, by title (tag dropped). */
-async function order(window: Locator, name: string, tag: string) {
-    return column(window, name)
+async function order(card: Locator, name: string, tag: string) {
+    return column(card, name)
         .getByRole('button', { name: new RegExp(`^Move .* ${tag} `) })
         .evaluateAll(
             (issues, tagged) =>
@@ -96,15 +96,15 @@ async function order(window: Locator, name: string, tag: string) {
 }
 
 /** A test's issue's drag handle ("Move <id> <title>"), by title. */
-function issueHandle(window: Locator, tag: string, title: string) {
-    return window.getByRole('button', {
+function issueHandle(card: Locator, tag: string, title: string) {
+    return card.getByRole('button', {
         name: new RegExp(`^Move .* ${tag} ${title}$`),
     });
 }
 
 /** The whole issue, by title. */
-function issueBody(window: Locator, tag: string, title: string) {
-    return window.getByRole('listitem', {
+function issueBody(card: Locator, tag: string, title: string) {
+    return card.getByRole('listitem', {
         name: new RegExp(` ${tag} ${title}$`),
     });
 }
@@ -126,28 +126,28 @@ test.describe('Issue boards', () => {
         // A view that frames just this board, then one step out: the board is
         // drawn scaled, not at actual size, which the overlay must match.
         const view = await mcp(page, 'save_view', {
-            surfaceId: SURFACE_ID,
+            roomId: ROOM_ID,
             name: `Frame ${board.tag}`,
-            itemIds: [board.id],
+            cardIds: [board.id],
         });
-        await page.goto(`${SURFACE}/views/${view.id}`);
+        await page.goto(`${ROOM}/views/${view.id}`);
         await waitForHydration(page);
         await page.getByRole('button', { name: 'Zoom out' }).click();
-        const window = boardWindow(page, board.title);
-        const handle = issueHandle(window, board.tag, 'Mouse me');
+        const card = boardCard(page, board.title);
+        const handle = issueHandle(card, board.tag, 'Mouse me');
         await expect(handle).toBeVisible();
-        await settled(window);
+        await settled(card);
         const scale = await page
             .locator('.trellis__viewport')
             .evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).a);
         expect(Math.abs(scale - 1)).toBeGreaterThan(0.05);
 
         const body = (await issueBody(
-            window,
+            card,
             board.tag,
             'Mouse me',
         ).boundingBox())!;
-        const to = (await column(window, 'In Review').boundingBox())!;
+        const to = (await column(card, 'In Review').boundingBox())!;
         const start = centerOf((await handle.boundingBox())!);
         const end = { x: to.x + to.width / 2, y: to.y + 60 };
 
@@ -167,10 +167,10 @@ test.describe('Issue boards', () => {
 
         await page.mouse.up();
         await expect
-            .poll(() => order(window, 'In Review', board.tag))
+            .poll(() => order(card, 'In Review', board.tag))
             .toEqual(['Mouse me']);
         await expect
-            .poll(() => order(window, 'Todo', board.tag))
+            .poll(() => order(card, 'Todo', board.tag))
             .toEqual(['Stay']);
         await mcp(page, 'delete_view', { viewId: view.id });
     });
@@ -179,26 +179,26 @@ test.describe('Issue boards', () => {
         authedPage: page,
     }) => {
         const board = await boardWith(page, ['Top', 'Middle', 'Bottom']);
-        await page.goto(`${SURFACE}/cards/${board.id}`);
+        await page.goto(`${ROOM}/cards/${board.id}`);
         await waitForHydration(page);
-        const window = boardWindow(page, board.title);
-        await settled(window);
+        const card = boardCard(page, board.title);
+        await settled(card);
 
         // Carry Bottom up so its middle sits in the gap between Top and
         // Middle: the line should appear there, and it should land there.
-        const top = (await issueBody(window, board.tag, 'Top').boundingBox())!;
+        const top = (await issueBody(card, board.tag, 'Top').boundingBox())!;
         const middle = (await issueBody(
-            window,
+            card,
             board.tag,
             'Middle',
         ).boundingBox())!;
         const bottomBody = (await issueBody(
-            window,
+            card,
             board.tag,
             'Bottom',
         ).boundingBox())!;
         const handle = (await issueHandle(
-            window,
+            card,
             board.tag,
             'Bottom',
         ).boundingBox())!;
@@ -217,9 +217,9 @@ test.describe('Issue boards', () => {
 
         // Nothing else moved, and the line sits between Top and Middle.
         expect(
-            (await issueBody(window, board.tag, 'Middle').boundingBox())!.y,
+            (await issueBody(card, board.tag, 'Middle').boundingBox())!.y,
         ).toBeCloseTo(middle.y, 0);
-        const line = column(window, 'Todo').locator(
+        const line = column(card, 'Todo').locator(
             'li[aria-hidden="true"] span',
         );
         await expect(line).toHaveCount(1);
@@ -229,11 +229,11 @@ test.describe('Issue boards', () => {
 
         await page.mouse.up();
         await expect
-            .poll(() => order(window, 'Todo', board.tag))
+            .poll(() => order(card, 'Todo', board.tag))
             .toEqual(['Top', 'Bottom', 'Middle']);
         await page.reload();
         await expect
-            .poll(() => order(window, 'Todo', board.tag))
+            .poll(() => order(card, 'Todo', board.tag))
             .toEqual(['Top', 'Bottom', 'Middle']);
     });
 
@@ -241,36 +241,36 @@ test.describe('Issue boards', () => {
         authedPage: page,
     }) => {
         const board = await boardWith(page, ['First', 'Second', 'Third']);
-        await page.goto(`${SURFACE}/cards/${board.id}`);
+        await page.goto(`${ROOM}/cards/${board.id}`);
         await waitForHydration(page);
-        const window = boardWindow(page, board.title);
-        await settled(window);
+        const card = boardCard(page, board.title);
+        await settled(card);
 
         // Space picks up, arrows move, Space drops. First goes below its two
         // siblings (any other tests' issues in Todo sit above them).
-        await issueHandle(window, board.tag, 'First').focus();
+        await issueHandle(card, board.tag, 'First').focus();
         await press(page, 'Space');
         await press(page, 'ArrowDown');
         await press(page, 'ArrowDown');
         await press(page, 'Space');
         await expect
-            .poll(() => order(window, 'Todo', board.tag))
+            .poll(() => order(card, 'Todo', board.tag))
             .toEqual(['Second', 'Third', 'First']);
 
-        await issueHandle(window, board.tag, 'Second').focus();
+        await issueHandle(card, board.tag, 'Second').focus();
         await press(page, 'Space');
         await press(page, 'ArrowRight');
         await press(page, 'Space');
         await expect
-            .poll(() => order(window, 'In Progress', board.tag))
+            .poll(() => order(card, 'In Progress', board.tag))
             .toEqual(['Second']);
 
         await page.reload();
         await expect
-            .poll(() => order(window, 'Todo', board.tag))
+            .poll(() => order(card, 'Todo', board.tag))
             .toEqual(['Third', 'First']);
         await expect
-            .poll(() => order(window, 'In Progress', board.tag))
+            .poll(() => order(card, 'In Progress', board.tag))
             .toEqual(['Second']);
     });
 
@@ -286,22 +286,18 @@ test.describe('Issue boards', () => {
         await createFreshUser(context, baseURL, 'touch');
         const page = await context.newPage();
         const board = await boardWith(page, ['Touch me']);
-        await page.goto(`${SURFACE}/cards/${board.id}`);
+        await page.goto(`${ROOM}/cards/${board.id}`);
         await waitForHydration(page);
-        const window = boardWindow(page, board.title);
-        await settled(window);
+        const card = boardCard(page, board.title);
+        await settled(card);
 
         // Raw touch events don't scroll the way Playwright's clicks do, and
         // the shared board's Todo column may have scrolled this issue away.
-        await issueHandle(
-            window,
-            board.tag,
-            'Touch me',
-        ).scrollIntoViewIfNeeded();
+        await issueHandle(card, board.tag, 'Touch me').scrollIntoViewIfNeeded();
         const start = centerOf(
-            (await issueHandle(window, board.tag, 'Touch me').boundingBox())!,
+            (await issueHandle(card, board.tag, 'Touch me').boundingBox())!,
         );
-        const to = (await column(window, 'Done').boundingBox())!;
+        const to = (await column(card, 'Done').boundingBox())!;
         const end = { x: to.x + to.width / 2, y: to.y + 40 };
 
         const cdp = await context.newCDPSession(page);
@@ -329,7 +325,7 @@ test.describe('Issue boards', () => {
         await touch('touchEnd');
 
         await expect
-            .poll(() => order(window, 'Done', board.tag))
+            .poll(() => order(card, 'Done', board.tag))
             .toEqual(['Touch me']);
         await context.close();
     });
@@ -338,33 +334,33 @@ test.describe('Issue boards', () => {
         authedPage: page,
     }) => {
         const board = await boardWith(page, ['Menu me']);
-        await page.goto(`${SURFACE}/cards/${board.id}`);
+        await page.goto(`${ROOM}/cards/${board.id}`);
         await waitForHydration(page);
-        const window = boardWindow(page, board.title);
-        await expect(window.getByTitle('Made by the Concierge')).toBeVisible();
+        const card = boardCard(page, board.title);
+        await expect(card.getByTitle('Made by the Concierge')).toBeVisible();
 
-        const menuIssue = issueHandle(window, board.tag, 'Menu me');
+        const menuIssue = issueHandle(card, board.tag, 'Menu me');
         const identifier = (await menuIssue.getAttribute('aria-label'))!.split(
             ' ',
         )[1];
-        await window
+        await card
             .getByRole('button', { name: `Status of ${identifier}: Todo` })
             .click();
         await page.getByRole('menuitemradio', { name: 'Done' }).click();
         await expect
-            .poll(() => order(window, 'Done', board.tag))
+            .poll(() => order(card, 'Done', board.tag))
             .toEqual(['Menu me']);
 
-        await window
+        await card
             .getByRole('button', { name: 'New issue in Backlog' })
             .click();
-        const field = window.getByRole('textbox', {
+        const field = card.getByRole('textbox', {
             name: 'New issue title in Backlog',
         });
         await field.fill(`${board.tag} Fresh idea`);
         await field.press('Enter');
         await expect
-            .poll(() => order(window, 'Backlog', board.tag))
+            .poll(() => order(card, 'Backlog', board.tag))
             .toEqual(['Fresh idea']);
     });
 });

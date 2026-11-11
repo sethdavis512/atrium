@@ -1,19 +1,19 @@
 /**
  * Documents are Portable Text (https://www.portabletext.org): a list of
  * blocks, each with spans of text and marks. On top of the standard text
- * blocks, two kinds of reference make documents part of the surface:
+ * blocks, two kinds of reference make documents part of the room:
  *
- * - `itemRef`, an annotation on a span: "this phrase points at that chat,
+ * - `cardRef`, an annotation on a span: "this phrase points at that chat,
  *   issue board, or pull request".
- * - `itemEmbed`, a block of its own: a card for another item, in the flow
+ * - `cardEmbed`, a block of its own: a card for another card, in the flow
  *   of the document.
  *
  * And `table`, a block of rows of cells, each cell a line of inline text
- * (marks and `itemRef`s included).
+ * (marks and `cardRef`s included).
  *
  * Agents write Markdown, not Portable Text: `markdownToPortableText` turns
- * it into blocks, with `[text](item:<id>)` for an `itemRef`, a line of
- * just `![](item:<id>)` for an `itemEmbed`, and GitHub-style pipe tables. `portableTextToMarkdown` goes
+ * it into blocks, with `[text](card:<id>)` for an `cardRef`, a line of
+ * just `![](card:<id>)` for an `cardEmbed`, and GitHub-style pipe tables. `portableTextToMarkdown` goes
  * back, so agents read documents the way they write them.
  */
 
@@ -35,9 +35,9 @@ export type Span = {
     marks: string[];
 };
 
-export type ItemRefMark = { _type: 'itemRef'; _key: string; itemId: string };
+export type CardRefMark = { _type: 'cardRef'; _key: string; cardId: string };
 export type LinkMark = { _type: 'link'; _key: string; href: string };
-export type MarkDef = ItemRefMark | LinkMark;
+export type MarkDef = CardRefMark | LinkMark;
 
 export type TextBlock = {
     _type: 'block';
@@ -49,10 +49,10 @@ export type TextBlock = {
     markDefs: MarkDef[];
 };
 
-export type ItemEmbedBlock = {
-    _type: 'itemEmbed';
+export type CardEmbedBlock = {
+    _type: 'cardEmbed';
     _key: string;
-    itemId: string;
+    cardId: string;
 };
 
 /** One cell of a table: inline text, like a block's without a style. */
@@ -72,7 +72,7 @@ export type TableBlock = {
     rows: TableRow[];
 };
 
-export type DocumentBlock = TextBlock | ItemEmbedBlock | TableBlock;
+export type DocumentBlock = TextBlock | CardEmbedBlock | TableBlock;
 
 const keySchema = z.string().min(1).max(64);
 
@@ -91,9 +91,9 @@ const markDefsSchema = z
     .array(
         z.discriminatedUnion('_type', [
             z.object({
-                _type: z.literal('itemRef'),
+                _type: z.literal('cardRef'),
                 _key: keySchema,
-                itemId: z.string().min(1),
+                cardId: z.string().min(1),
             }),
             z.object({
                 _type: z.literal('link'),
@@ -121,9 +121,9 @@ export const documentBlocksSchema = z
                 markDefs: markDefsSchema,
             }),
             z.object({
-                _type: z.literal('itemEmbed'),
+                _type: z.literal('cardEmbed'),
                 _key: keySchema,
-                itemId: z.string().min(1),
+                cardId: z.string().min(1),
             }),
             z.object({
                 _type: z.literal('table'),
@@ -161,8 +161,8 @@ function randomKey() {
     return crypto.randomUUID().slice(0, 8);
 }
 
-const ITEM_PREFIX = 'item:';
-const EMBED_LINE = /^!\[[^\]]*\]\(item:([^)\s]+)\)$/;
+const CARD_PREFIX = 'card:';
+const EMBED_LINE = /^!\[[^\]]*\]\(card:([^)\s]+)\)$/;
 const HEADING = /^(#{1,3})\s+(.*)$/;
 const LIST_LINE = /^(\s*)([-*]|\d+[.)])\s+(.*)$/;
 const QUOTE = /^>\s?(.*)$/;
@@ -270,7 +270,7 @@ export function markdownToPortableText(
         const embed = EMBED_LINE.exec(trimmed);
         if (embed) {
             flush();
-            blocks.push({ _type: 'itemEmbed', _key: key(), itemId: embed[1]! });
+            blocks.push({ _type: 'cardEmbed', _key: key(), cardId: embed[1]! });
             continue;
         }
         const heading = HEADING.exec(trimmed);
@@ -313,7 +313,7 @@ const DECORATOR_TOKENS: [string, Decorator][] = [
 
 /**
  * Spans for one line of inline Markdown: `**strong**`, `*em*`, `` `code` ``,
- * and `[text](href)` links (`item:<id>` hrefs become `itemRef`s). Marks
+ * and `[text](href)` links (`card:<id>` hrefs become `cardRef`s). Marks
  * nest: a link's text can be bold, and so on.
  */
 function parseInline(
@@ -357,11 +357,11 @@ function parseInline(
             if (link) {
                 pushPlain();
                 const href = link[2]!;
-                const def: MarkDef = href.startsWith(ITEM_PREFIX)
+                const def: MarkDef = href.startsWith(CARD_PREFIX)
                     ? {
-                          _type: 'itemRef',
+                          _type: 'cardRef',
                           _key: key(),
-                          itemId: href.slice(ITEM_PREFIX.length),
+                          cardId: href.slice(CARD_PREFIX.length),
                       }
                     : { _type: 'link', _key: key(), href };
                 markDefs.push(def);
@@ -423,8 +423,8 @@ export function portableTextToMarkdown(blocks: DocumentBlock[]): string {
         if (previous && !inList) lines.push('');
         previous = block;
 
-        if (block._type === 'itemEmbed') {
-            lines.push(`![](${ITEM_PREFIX}${block.itemId})`);
+        if (block._type === 'cardEmbed') {
+            lines.push(`![](${CARD_PREFIX}${block.cardId})`);
             continue;
         }
         if (block._type === 'table') {
@@ -478,8 +478,8 @@ function spanMarkdown(span: Span, markDefs: MarkDef[]): string {
             continue;
         }
         const def = markDefs.find((candidate) => candidate._key === mark);
-        if (def?._type === 'itemRef') {
-            text = `[${text}](${ITEM_PREFIX}${def.itemId})`;
+        if (def?._type === 'cardRef') {
+            text = `[${text}](${CARD_PREFIX}${def.cardId})`;
         } else if (def?._type === 'link') text = `[${text}](${def.href})`;
     }
     return text;
@@ -490,16 +490,16 @@ export function cellText(cell: TableCell): string {
     return cell.children.map((span) => span.text).join('');
 }
 
-/** Every item a document points at, through `itemRef`s or `itemEmbed`s. */
-export function referencedItemIds(blocks: DocumentBlock[]): string[] {
+/** Every card a document points at, through `cardRef`s or `cardEmbed`s. */
+export function referencedCardIds(blocks: DocumentBlock[]): string[] {
     const ids = new Set<string>();
     const fromMarks = (markDefs: MarkDef[]) => {
         for (const def of markDefs) {
-            if (def._type === 'itemRef') ids.add(def.itemId);
+            if (def._type === 'cardRef') ids.add(def.cardId);
         }
     };
     for (const block of blocks) {
-        if (block._type === 'itemEmbed') ids.add(block.itemId);
+        if (block._type === 'cardEmbed') ids.add(block.cardId);
         else if (block._type === 'table') {
             for (const row of block.rows) {
                 for (const cell of row.cells) fromMarks(cell.markDefs);

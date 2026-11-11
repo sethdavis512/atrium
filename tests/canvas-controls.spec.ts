@@ -15,20 +15,20 @@ async function mcp(page: Page, name: string, args: Record<string, unknown>) {
     return JSON.parse(result.content[0].text);
 }
 
-/** A surface of the test's own, so nothing here touches the seed. */
-async function freshSurface(page: Page) {
-    const surface = await mcp(page, 'create_room', {
+/** A room of the test's own, so nothing here touches the seed. */
+async function freshRoom(page: Page) {
+    const room = await mcp(page, 'create_room', {
         spaceId: 'design',
         name: `Controls ${crypto.randomUUID().slice(0, 6)}`,
     });
-    // A new surface starts with a chat with the agent; this test wants an
+    // A new room starts with a chat with the agent; this test wants an
     // empty canvas.
     for (const card of await mcp(page, 'list_cards', {
-        surfaceId: surface.id,
+        roomId: room.id,
     })) {
-        await mcp(page, 'delete_card', { itemId: card.id });
+        await mcp(page, 'delete_card', { cardId: card.id });
     }
-    return surface as { id: string };
+    return room as { id: string };
 }
 
 async function center(locator: Locator) {
@@ -47,12 +47,12 @@ test.describe('Canvas controls', () => {
     test('a sketch draws with the mouse, keeps the drawing, and undoes', async ({
         authedPage: page,
     }) => {
-        const surface = await freshSurface(page);
+        const room = await freshRoom(page);
         const sketch = await mcp(page, 'add_sketch', {
-            surfaceId: surface.id,
+            roomId: room.id,
             title: 'Napkin',
         });
-        await page.goto(`/surfaces/${surface.id}/cards/${sketch.id}`);
+        await page.goto(`/rooms/${room.id}/cards/${sketch.id}`);
         await waitForHydration(page);
 
         const card = page.getByRole('article', { name: 'Sketch: Napkin' });
@@ -70,7 +70,7 @@ test.describe('Canvas controls', () => {
         await expect
             .poll(
                 async () =>
-                    (await mcp(page, 'get_card', { itemId: sketch.id })).strokes
+                    (await mcp(page, 'get_card', { cardId: sketch.id })).strokes
                         ?.length,
             )
             .toBe(1);
@@ -83,7 +83,7 @@ test.describe('Canvas controls', () => {
         await expect
             .poll(
                 async () =>
-                    (await mcp(page, 'get_card', { itemId: sketch.id })).strokes
+                    (await mcp(page, 'get_card', { cardId: sketch.id })).strokes
                         ?.length,
             )
             .toBe(0);
@@ -92,12 +92,12 @@ test.describe('Canvas controls', () => {
     test('a locked card stays put when dragged, until unlocked', async ({
         authedPage: page,
     }) => {
-        const surface = await freshSurface(page);
+        const room = await freshRoom(page);
         const note = await mcp(page, 'add_note', {
-            surfaceId: surface.id,
+            roomId: room.id,
             text: 'Pinned',
         });
-        await page.goto(`/surfaces/${surface.id}`);
+        await page.goto(`/rooms/${room.id}`);
         await waitForHydration(page);
 
         const card = page.getByRole('article', { name: 'Sticky note: Pinned' });
@@ -135,16 +135,16 @@ test.describe('Canvas controls', () => {
     test('dragging from a card links it to another; right-clicking the link removes it', async ({
         authedPage: page,
     }) => {
-        const surface = await freshSurface(page);
+        const room = await freshRoom(page);
         const a = await mcp(page, 'add_note', {
-            surfaceId: surface.id,
+            roomId: room.id,
             text: 'Cause',
         });
         await mcp(page, 'add_note', {
-            surfaceId: surface.id,
+            roomId: room.id,
             text: 'Effect',
         });
-        await page.goto(`/surfaces/${surface.id}`);
+        await page.goto(`/rooms/${room.id}`);
         await waitForHydration(page);
         await expect(page.locator('g[data-edge-id]')).toHaveCount(0);
 
@@ -188,12 +188,12 @@ test.describe('Canvas controls', () => {
     test('in focus, double-clicking the header or clicking the canvas goes back', async ({
         authedPage: page,
     }) => {
-        const surface = await freshSurface(page);
+        const room = await freshRoom(page);
         const note = await mcp(page, 'add_note', {
-            surfaceId: surface.id,
+            roomId: room.id,
             text: 'Focus me',
         });
-        const path = `/surfaces/${surface.id}`;
+        const path = `/rooms/${room.id}`;
         await page.goto(`${path}/cards/${note.id}`);
         await waitForHydration(page);
         const header = page
@@ -216,9 +216,9 @@ test.describe('Canvas controls', () => {
     test('an issue opens inside its board, Linear style, and edits in place', async ({
         authedPage: page,
     }) => {
-        const surface = await freshSurface(page);
+        const room = await freshRoom(page);
         const board = await mcp(page, 'create_board', {
-            surfaceId: surface.id,
+            roomId: room.id,
             title: 'Detail board',
             key: 'DB',
         });
@@ -227,7 +227,7 @@ test.describe('Canvas controls', () => {
             title: 'Write the brief',
             status: 'todo',
         });
-        await page.goto(`/surfaces/${surface.id}/cards/${board.id}`);
+        await page.goto(`/rooms/${room.id}/cards/${board.id}`);
         await waitForHydration(page);
 
         await page
@@ -251,7 +251,7 @@ test.describe('Canvas controls', () => {
 
         await expect
             .poll(async () => {
-                const card = await mcp(page, 'get_card', { itemId: board.id });
+                const card = await mcp(page, 'get_card', { cardId: board.id });
                 const issue = card.issues[0];
                 return [issue.title, issue.status, issue.comments?.length];
             })
@@ -271,12 +271,12 @@ test.describe('Canvas controls', () => {
     test('a card renames by clicking its title, from its header menu, or by an agent', async ({
         authedPage: page,
     }) => {
-        const surface = await freshSurface(page);
+        const room = await freshRoom(page);
         const sketch = await mcp(page, 'add_sketch', {
-            surfaceId: surface.id,
+            roomId: room.id,
             title: 'Napkin',
         });
-        await page.goto(`/surfaces/${surface.id}`);
+        await page.goto(`/rooms/${room.id}`);
         await waitForHydration(page);
 
         // Click the title, type, Enter.
@@ -291,7 +291,7 @@ test.describe('Canvas controls', () => {
         await expect
             .poll(
                 async () =>
-                    (await mcp(page, 'get_card', { itemId: sketch.id })).title,
+                    (await mcp(page, 'get_card', { cardId: sketch.id })).title,
             )
             .toBe('Floor plan');
         await expect(
@@ -322,7 +322,7 @@ test.describe('Canvas controls', () => {
 
         // An agent renames it too.
         await mcp(page, 'rename_card', {
-            itemId: sketch.id,
+            cardId: sketch.id,
             title: 'Final plan',
         });
         await expect(
@@ -333,12 +333,12 @@ test.describe('Canvas controls', () => {
     test('double-clicking a title still focuses the card instead of renaming it', async ({
         authedPage: page,
     }) => {
-        const surface = await freshSurface(page);
+        const room = await freshRoom(page);
         const sketch = await mcp(page, 'add_sketch', {
-            surfaceId: surface.id,
+            roomId: room.id,
             title: 'Napkin',
         });
-        await page.goto(`/surfaces/${surface.id}`);
+        await page.goto(`/rooms/${room.id}`);
         await waitForHydration(page);
         await page.getByRole('heading', { name: 'Napkin' }).dblclick();
         await expect(page).toHaveURL(new RegExp(`/cards/${sketch.id}$`));
@@ -351,9 +351,9 @@ test.describe('Canvas controls', () => {
     test('deleting a card asks first, then takes the cards hanging under it too', async ({
         authedPage: page,
     }) => {
-        const surface = await freshSurface(page);
+        const room = await freshRoom(page);
         const doc = await mcp(page, 'create_document', {
-            surfaceId: surface.id,
+            roomId: room.id,
             title: 'Old plan',
         });
         await mcp(page, 'add_image', {
@@ -361,7 +361,7 @@ test.describe('Canvas controls', () => {
             title: 'Old sketch',
             attachedTo: doc.id,
         });
-        await page.goto(`/surfaces/${surface.id}`);
+        await page.goto(`/rooms/${room.id}`);
         await waitForHydration(page);
         const card = page.getByRole('article', { name: 'Document: Old plan' });
         // Zoomed out, a click on a card zooms to it; get to reading size.
@@ -394,8 +394,7 @@ test.describe('Canvas controls', () => {
         await expect
             .poll(
                 async () =>
-                    (await mcp(page, 'list_cards', { surfaceId: surface.id }))
-                        .length,
+                    (await mcp(page, 'list_cards', { roomId: room.id })).length,
             )
             .toBe(0);
     });
@@ -403,14 +402,14 @@ test.describe('Canvas controls', () => {
     test('agents link and delete cards over MCP', async ({
         authedPage: page,
     }) => {
-        const surface = await freshSurface(page);
+        const room = await freshRoom(page);
         const start = await mcp(page, 'add_note', {
-            surfaceId: surface.id,
+            roomId: room.id,
             text: 'Start',
             color: 'emerald',
         });
         const end = await mcp(page, 'add_note', {
-            surfaceId: surface.id,
+            roomId: room.id,
             text: 'End',
         });
         await mcp(page, 'link_cards', {
@@ -418,14 +417,14 @@ test.describe('Canvas controls', () => {
             to: end.id,
             label: 'then',
         });
-        await page.goto(`/surfaces/${surface.id}`);
+        await page.goto(`/rooms/${room.id}`);
         await waitForHydration(page);
         await expect(
             page.getByRole('article', { name: 'Sticky note: End' }),
         ).toBeVisible();
         await expect(page.locator('g[data-edge-id]')).toHaveCount(1);
 
-        const result = await mcp(page, 'delete_card', { itemId: start.id });
+        const result = await mcp(page, 'delete_card', { cardId: start.id });
         expect(result.deleted).toEqual([start.id]);
         await expect(
             page.getByRole('article', { name: 'Sticky note: Start' }),

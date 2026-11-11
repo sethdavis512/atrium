@@ -5,7 +5,7 @@ import {
     documentBlocksSchema,
     markdownToPortableText,
     portableTextToMarkdown,
-    referencedItemIds,
+    referencedCardIds,
 } from './portable-text';
 
 function counter() {
@@ -51,17 +51,17 @@ describe('markdownToPortableText', () => {
         ]);
     });
 
-    it('marks bold, italic, code, links, and item references, nested', () => {
+    it('marks bold, italic, code, links, and card references, nested', () => {
         const [block] = markdownToPortableText(
-            'Say **hi to [Rosa](item:chat-customers)**, *see* `code` and [docs](https://example.com), not doc_sso_notes.',
+            'Say **hi to [Rosa](card:chat-customers)**, *see* `code` and [docs](https://example.com), not doc_sso_notes.',
             { key: counter() },
         );
         invariant(block?._type === 'block');
         const nameOf = (mark: string) => {
             const def = block.markDefs.find((d) => d._key === mark);
             if (!def) return mark;
-            return def._type === 'itemRef'
-                ? `itemRef:${def.itemId}`
+            return def._type === 'cardRef'
+                ? `cardRef:${def.cardId}`
                 : `link:${def.href}`;
         };
         expect(
@@ -69,7 +69,7 @@ describe('markdownToPortableText', () => {
         ).toEqual([
             ['Say ', []],
             ['hi to ', ['strong']],
-            ['Rosa', ['strong', 'itemRef:chat-customers']],
+            ['Rosa', ['strong', 'cardRef:chat-customers']],
             [', ', []],
             ['see', ['em']],
             [' ', []],
@@ -83,12 +83,12 @@ describe('markdownToPortableText', () => {
         );
     });
 
-    it('embeds an item from a line of its own', () => {
+    it('embeds a card from a line of its own', () => {
         expect(
-            markdownToPortableText('Before\n![](item:board-atlas)\nAfter', {
+            markdownToPortableText('Before\n![](card:board-atlas)\nAfter', {
                 key: counter(),
             }).map((block) => block._type),
-        ).toEqual(['block', 'itemEmbed', 'block']);
+        ).toEqual(['block', 'cardEmbed', 'block']);
     });
 });
 
@@ -97,7 +97,7 @@ describe('tables', () => {
         'The notes:',
         '| Note | Color | Purpose |',
         '| --- | :---: | --- |',
-        '| [Sticky note 1](item:note-1) | **Amber** | A first idea |',
+        '| [Sticky note 1](card:note-1) | **Amber** | A first idea |',
         '| Sticky note 2 | Sky | Pipes \\| stay put |',
         'After the table.',
     ].join('\n');
@@ -117,13 +117,13 @@ describe('tables', () => {
             ['Sticky note 1', 'Amber', 'A first idea'],
             ['Sticky note 2', 'Sky', 'Pipes | stay put'],
         ]);
-        // Cells keep marks and item references.
+        // Cells keep marks and card references.
         const [ref] = table.rows[1]!.cells;
         expect(ref!.markDefs).toEqual([
-            { _type: 'itemRef', _key: expect.any(String), itemId: 'note-1' },
+            { _type: 'cardRef', _key: expect.any(String), cardId: 'note-1' },
         ]);
         expect(table.rows[1]!.cells[1]!.children[0]!.marks).toEqual(['strong']);
-        expect(referencedItemIds(blocks)).toEqual(['note-1']);
+        expect(referencedCardIds(blocks)).toEqual(['note-1']);
     });
 
     it('pads short rows, and reads a table with no header', () => {
@@ -144,7 +144,7 @@ describe('tables', () => {
                 '',
                 '| Note | Color | Purpose |',
                 '| --- | --- | --- |',
-                '| [Sticky note 1](item:note-1) | **Amber** | A first idea |',
+                '| [Sticky note 1](card:note-1) | **Amber** | A first idea |',
                 '| Sticky note 2 | Sky | Pipes \\| stay put |',
                 '',
                 'After the table.',
@@ -159,13 +159,13 @@ describe('portableTextToMarkdown', () => {
         const markdown = [
             '## Plan',
             '',
-            'Ship [**the API freeze**](item:pr-api-freeze) with *care* and `tests`.',
+            'Ship [**the API freeze**](card:pr-api-freeze) with *care* and `tests`.',
             '',
             '- One',
             '  - Nested',
             '1. First',
             '',
-            '![](item:board-atlas)',
+            '![](card:board-atlas)',
             '',
             '> Read [more](https://example.com)',
         ].join('\n');
@@ -175,12 +175,12 @@ describe('portableTextToMarkdown', () => {
     });
 });
 
-describe('referencedItemIds', () => {
-    it('lists each item linked or embedded once', () => {
+describe('referencedCardIds', () => {
+    it('lists each card linked or embedded once', () => {
         expect(
-            referencedItemIds(
+            referencedCardIds(
                 markdownToPortableText(
-                    '[a](item:chat-launch) [b](item:chat-launch)\n\n![](item:board-atlas)',
+                    '[a](card:chat-launch) [b](card:chat-launch)\n\n![](card:board-atlas)',
                 ),
             ),
         ).toEqual(['chat-launch', 'board-atlas']);
@@ -190,7 +190,7 @@ describe('referencedItemIds', () => {
 describe('documentBlocksSchema', () => {
     it('accepts what documents hold, and drops unknown fields', () => {
         const blocks = markdownToPortableText(
-            '## Hi\n\n- [Rosa](item:chat-customers) and [docs](https://x.dev)\n\n![](item:board-atlas)',
+            '## Hi\n\n- [Rosa](card:chat-customers) and [docs](https://x.dev)\n\n![](card:board-atlas)',
         );
         const extra = blocks.map((block) => ({ ...block, junk: true }));
         expect(documentBlocksSchema.parse(extra)).toEqual(blocks);

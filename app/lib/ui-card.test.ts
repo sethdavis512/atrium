@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import type { BoardItem, Person, SurfaceItem } from './surface';
+import type { BoardCard, Person, Card } from './room';
 import { uiData, uiGuide, uiSpecProblems } from './ui-card';
 
 const people: Person[] = [
     { id: 'ann', name: 'Ann', initials: 'A', role: 'Member' },
 ];
 
-const board: BoardItem = {
+const board: BoardCard = {
     kind: 'board',
     id: 'board-1',
-    surfaceId: 's',
+    roomId: 's',
     title: 'Launch',
     key: 'LCH',
     createdById: 'ann',
@@ -37,11 +37,11 @@ const board: BoardItem = {
             updatedAt: '2026-10-29T00:00:00Z',
         },
     ],
-} as BoardItem;
+} as BoardCard;
 
 describe('uiData', () => {
-    it('lays the surface out for $state paths, by position and by id', () => {
-        const data = uiData([board as SurfaceItem], people, 'ann') as {
+    it('lays the room out for $state paths, by position and by id', () => {
+        const data = uiData([board as Card], people, 'ann') as {
             stats: Record<string, number>;
             boards: {
                 issues: Record<string, unknown>[];

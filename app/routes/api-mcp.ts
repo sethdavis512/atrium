@@ -1,12 +1,12 @@
 import { timingSafeEqual } from 'node:crypto';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { env } from '~/lib/env.server';
-import { createSurfaceMcpServer } from '~/mcp/surface-mcp.server';
-import { markChanged } from '~/models/surface-events.server';
+import { createRoomMcpServer } from '~/mcp/room-mcp.server';
+import { markChanged } from '~/models/room-events.server';
 import type { Route } from './+types/api-mcp';
 
 /**
- * The surface's MCP endpoint (Streamable HTTP, stateless: each request gets a
+ * The room's MCP endpoint (Streamable HTTP, stateless: each request gets a
  * fresh server and answers in plain JSON). Point an agent at
  * `<base URL>/api/mcp`.
  */
@@ -42,7 +42,7 @@ async function handle(request: Request): Promise<Response> {
     const refusal = refuse(request);
     if (refusal) return refusal;
 
-    const server = createSurfaceMcpServer();
+    const server = createRoomMcpServer();
     const transport = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
         enableJsonResponse: true,
@@ -51,7 +51,7 @@ async function handle(request: Request): Promise<Response> {
     try {
         return await transport.handleRequest(request);
     } finally {
-        // Whatever the tool wrote, open surfaces hear about it.
+        // Whatever the tool wrote, open rooms hear about it.
         markChanged();
     }
 }

@@ -15,22 +15,22 @@ async function mcp(page: Page, name: string, args: Record<string, unknown>) {
     return JSON.parse(result.content[0].text);
 }
 
-/** A surface of the test's own, so nothing here touches the seed. */
-async function openFreshSurface(page: Page) {
-    const surface = await mcp(page, 'create_room', {
+/** A room of the test's own, so nothing here touches the seed. */
+async function openFreshRoom(page: Page) {
+    const room = await mcp(page, 'create_room', {
         spaceId: 'design',
         name: `Canvas ${crypto.randomUUID().slice(0, 6)}`,
     });
-    // A new surface starts with a chat with the agent; this test wants an
+    // A new room starts with a chat with the agent; this test wants an
     // empty canvas.
     for (const card of await mcp(page, 'list_cards', {
-        surfaceId: surface.id,
+        roomId: room.id,
     })) {
-        await mcp(page, 'delete_card', { itemId: card.id });
+        await mcp(page, 'delete_card', { cardId: card.id });
     }
-    await page.goto(`/surfaces/${surface.id}`);
+    await page.goto(`/rooms/${room.id}`);
     await waitForHydration(page);
-    return surface as { id: string };
+    return room as { id: string };
 }
 
 /** Right-clicks empty canvas at a point inside it. */
@@ -50,7 +50,7 @@ test.describe('Canvas extras', () => {
     test('a sticky note takes typing and keeps it', async ({
         authedPage: page,
     }) => {
-        await openFreshSurface(page);
+        await openFreshRoom(page);
         await page.getByRole('button', { name: 'Add', exact: true }).click();
         await page.getByRole('menuitem', { name: 'Sticky note' }).click();
 
@@ -58,7 +58,7 @@ test.describe('Canvas extras', () => {
             name: 'Sticky note: Empty note',
         });
         await expect(note).toBeVisible();
-        // It arrived while the surface was open, so it fades in.
+        // It arrived while the room was open, so it fades in.
         await expect(
             page.locator('[data-node-id^="note-"]').first(),
         ).toHaveClass(/animate-card-in/);
@@ -83,7 +83,7 @@ test.describe('Canvas extras', () => {
     test('the filter bar stays folded until used, and says when it is filtering', async ({
         authedPage: page,
     }) => {
-        await page.goto('/surfaces/atlas-launch');
+        await page.goto('/rooms/atlas-launch');
         await waitForHydration(page);
         const bar = page.getByRole('toolbar', { name: 'Filter cards' });
         await expect(bar.getByRole('button', { name: 'Filter' })).toBeVisible();
@@ -102,7 +102,7 @@ test.describe('Canvas extras', () => {
     test('right-clicking empty canvas zooms and adds a card right there', async ({
         authedPage: page,
     }) => {
-        await openFreshSurface(page);
+        await openFreshRoom(page);
         const viewport = page.locator('.trellis__viewport');
         const scale = () =>
             viewport.evaluate(
@@ -142,7 +142,7 @@ test.describe('Canvas extras', () => {
         authedPage: page,
     }) => {
         await page.setViewportSize({ width: 1400, height: 1000 });
-        await page.goto('/surfaces/launch-retro');
+        await page.goto('/rooms/launch-retro');
         await waitForHydration(page);
         // Zoomed in to reading size first, as a person would be (zoomed
         // out, a click on a card zooms to it instead).
@@ -156,11 +156,11 @@ test.describe('Canvas extras', () => {
             name: 'Document: Launch retro notes',
         });
         await doc.locator('.prose').dblclick();
-        await expect(page).toHaveURL(/\/surfaces\/launch-retro$/);
+        await expect(page).toHaveURL(/\/rooms\/launch-retro$/);
 
         await doc.locator('header').dblclick();
         await expect(page).toHaveURL(
-            /\/surfaces\/launch-retro\/cards\/doc-retro-notes$/,
+            /\/rooms\/launch-retro\/cards\/doc-retro-notes$/,
         );
     });
 });

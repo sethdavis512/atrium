@@ -2,26 +2,26 @@ import { useState } from 'react';
 import { data, Form, Link, redirect, useNavigation } from 'react-router';
 import { LayersIcon, PlusIcon } from 'lucide-react';
 import { z } from 'zod';
-import { KIND_ICONS, KIND_NAMES } from '~/components/surface/kind-icons';
+import { KIND_ICONS, KIND_NAMES } from '~/components/room/kind-icons';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { APP_NAME } from '~/config';
 import { requireUserFromContext } from '~/context';
-import { surfacePath, type SurfaceSummary } from '~/lib/surface';
+import { roomPath, type RoomSummary } from '~/lib/room';
 import { authMiddleware } from '~/middleware/auth';
 import {
     createSpace,
-    createSurface,
+    createRoom,
     getWorkspace,
-    SurfaceError,
-} from '~/models/surface.server';
+    RoomError,
+} from '~/models/room.server';
 import type { Route } from './+types/home';
 
 export const middleware: Route.MiddlewareFunction[] = [authMiddleware];
 
 /**
- * The workspace: every space, each with its surfaces. Open a surface, or
- * start a space or a surface (which opens once it exists).
+ * The workspace: every space, each with its rooms. Open a room, or
+ * start a space or a room (which opens once it exists).
  */
 export async function loader({ context }: Route.LoaderArgs) {
     requireUserFromContext(context);
@@ -34,7 +34,7 @@ const intentSchema = z.discriminatedUnion('intent', [
         name: z.string().trim().min(1).max(60),
     }),
     z.object({
-        intent: z.literal('create-surface'),
+        intent: z.literal('create-room'),
         spaceId: z.string().min(1),
         name: z.string().trim().min(1).max(60),
     }),
@@ -54,13 +54,13 @@ export async function action({ request, context }: Route.ActionArgs) {
             createSpace({ name: input.name });
             return { error: null };
         }
-        const surface = createSurface({
+        const room = createRoom({
             spaceId: input.spaceId,
             name: input.name,
         });
-        throw redirect(surfacePath(surface.id));
+        throw redirect(roomPath(room.id));
     } catch (error) {
-        if (error instanceof SurfaceError) {
+        if (error instanceof RoomError) {
             return data({ error: error.message }, { status: 404 });
         }
         throw error;
@@ -110,14 +110,14 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                             )}
                         </div>
                         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {space.surfaces.map((surface) => (
-                                <li key={surface.id}>
-                                    <SurfaceTile surface={surface} />
+                            {space.rooms.map((room) => (
+                                <li key={room.id}>
+                                    <RoomTile room={room} />
                                 </li>
                             ))}
                             <li className="flex items-center rounded-xl border border-dashed p-4">
                                 <NewForm
-                                    intent="create-surface"
+                                    intent="create-room"
                                     label="New room"
                                     placeholder="Room name"
                                     spaceId={space.id}
@@ -131,10 +131,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     );
 }
 
-function SurfaceTile({ surface }: { surface: SurfaceSummary }) {
+function RoomTile({ room }: { room: RoomSummary }) {
     return (
         <Link
-            to={surfacePath(surface.id)}
+            to={roomPath(room.id)}
             className="bg-card hover:border-ring/60 focus-visible:ring-ring flex h-full flex-col gap-3 rounded-xl border p-4 shadow-xs transition-colors outline-none focus-visible:ring-2"
         >
             <span className="flex items-center gap-2">
@@ -142,21 +142,21 @@ function SurfaceTile({ surface }: { surface: SurfaceSummary }) {
                     aria-hidden="true"
                     className="text-muted-foreground size-4 shrink-0"
                 />
-                <span className="truncate font-medium">{surface.name}</span>
+                <span className="truncate font-medium">{room.name}</span>
             </span>
-            {surface.description && (
+            {room.description && (
                 <span className="text-muted-foreground line-clamp-2 text-sm">
-                    {surface.description}
+                    {room.description}
                 </span>
             )}
             <span className="text-muted-foreground mt-auto flex items-center gap-2 text-xs">
                 <span>
-                    {surface.cardCount === 0
+                    {room.cardCount === 0
                         ? 'Empty'
-                        : `${surface.cardCount} card${surface.cardCount === 1 ? '' : 's'}`}
+                        : `${room.cardCount} card${room.cardCount === 1 ? '' : 's'}`}
                 </span>
                 <span aria-hidden="true" className="flex gap-1">
-                    {surface.kinds.map((kind) => {
+                    {room.kinds.map((kind) => {
                         const Icon = KIND_ICONS[kind];
                         return (
                             <Icon
@@ -173,7 +173,7 @@ function SurfaceTile({ surface }: { surface: SurfaceSummary }) {
 }
 
 type NewFormProps = {
-    intent: 'create-space' | 'create-surface';
+    intent: 'create-space' | 'create-room';
     label: string;
     placeholder: string;
     spaceId?: string;

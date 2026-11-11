@@ -14,19 +14,17 @@ describe('nav panel cookie', () => {
 
     it('keeps saved widths within the drag limits', () => {
         expect(serializeNavPanel({ width: 9999, collapsed: false })).toMatch(
-            /^surface-nav-panel=420-0;/,
+            /^room-nav-panel=420-0;/,
         );
         expect(serializeNavPanel({ width: 12.4, collapsed: false })).toMatch(
-            /^surface-nav-panel=208-0;/,
+            /^room-nav-panel=208-0;/,
         );
     });
 
     it('falls back to the default for missing or odd cookies', () => {
         expect(readNavPanel(null)).toEqual(DEFAULT_NAV_PANEL);
-        expect(readNavPanel('surface-nav-panel=wide')).toEqual(
-            DEFAULT_NAV_PANEL,
-        );
-        expect(readNavPanel('surface-nav-panel=5000-1')).toEqual(
+        expect(readNavPanel('room-nav-panel=wide')).toEqual(DEFAULT_NAV_PANEL);
+        expect(readNavPanel('room-nav-panel=5000-1')).toEqual(
             DEFAULT_NAV_PANEL,
         );
     });

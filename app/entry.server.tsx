@@ -55,13 +55,13 @@ function setSecurityHeaders(headers: Headers, nonce: string) {
             "base-uri 'self'",
             "frame-ancestors 'none'",
             "form-action 'self'",
-            // Image windows show pictures from anywhere (https only).
+            // Image cards show pictures from anywhere (https only).
             "img-src 'self' data: blob: https:",
             "font-src 'self' https://fonts.gstatic.com",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             `script-src 'self' 'nonce-${nonce}'`,
             "connect-src 'self'",
-            // Video and web page windows embed other sites (https only).
+            // Video and web page cards embed other sites (https only).
             'frame-src https:',
             "object-src 'none'",
         ].join('; '),

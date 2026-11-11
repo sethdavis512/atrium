@@ -1,23 +1,23 @@
 import MiniSearch from 'minisearch';
 import { cellText, type DocumentBlock } from './portable-text';
-import type { SurfaceItem, SurfaceItemKind } from './surface';
+import type { Card, CardKind } from './room';
 
 /**
- * Search across the surface, the same in the browser (the ⌘K palette and
- * the filter bar, over the loader's items) and on the server (the MCP
- * `search` tool, over the store). Every item is one entry (its title and
+ * Search across the room, the same in the browser (the ⌘K palette and
+ * the filter bar, over the loader's cards) and on the server (the MCP
+ * `search` tool, over the store). Every card is one entry (its title and
  * its text), and every chat message and board issue is an entry of its
- * own, so a hit can point inside a window. MiniSearch matches word
+ * own, so a hit can point inside a card. MiniSearch matches word
  * prefixes and small typos, title words count most, and every word of the
  * query has to match somewhere in the entry.
  */
 
 export type SearchHit = {
-    itemId: string;
-    kind: SurfaceItemKind;
-    /** The item's title. */
+    cardId: string;
+    kind: CardKind;
+    /** The card's title. */
     title: string;
-    /** A message or issue inside the item, when that's where it matched. */
+    /** A message or issue inside the card, when that's where it matched. */
     subId?: string;
     /** Who sent the message, or the issue's identifier. */
     subLabel?: string;
@@ -28,18 +28,18 @@ export type SearchHit = {
     score: number;
 };
 
-export type SurfaceSearchResult = {
-    /** Best hit per item, best first, at most `limit`. */
+export type RoomSearchResult = {
+    /** Best hit per card, best first, at most `limit`. */
     hits: SearchHit[];
-    /** Every item with any hit: the filter bar dims the rest. */
-    itemIds: Set<string>;
+    /** Every card with any hit: the filter bar dims the rest. */
+    cardIds: Set<string>;
 };
 
 type Entry = {
     id: string;
-    itemId: string;
-    kind: SurfaceItemKind;
-    itemTitle: string;
+    cardId: string;
+    kind: CardKind;
+    cardTitle: string;
     subId?: string;
     subLabel?: string;
     title: string;
@@ -90,26 +90,26 @@ function uiText(spec: { elements: Record<string, unknown> }): string {
         .join(' ');
 }
 
-/** The entries an item contributes: itself, plus its messages or issues. */
-function entriesOf(item: SurfaceItem, { nameOf }: Options): Entry[] {
+/** The entries a card contributes: itself, plus its messages or issues. */
+function entriesOf(card: Card, { nameOf }: Options): Entry[] {
     const base = {
-        itemId: item.id,
-        kind: item.kind,
-        itemTitle: item.title,
+        cardId: card.id,
+        kind: card.kind,
+        cardTitle: card.title,
     };
     const own = (text: string): Entry => ({
         ...base,
-        id: item.id,
-        title: item.title,
+        id: card.id,
+        title: card.title,
         text,
     });
-    switch (item.kind) {
+    switch (card.kind) {
         case 'chat':
             return [
                 own(''),
-                ...item.messages.map((message) => ({
+                ...card.messages.map((message) => ({
                     ...base,
-                    id: `${item.id}:${message.id}`,
+                    id: `${card.id}:${message.id}`,
                     subId: message.id,
                     subLabel: nameOf?.(message.authorId),
                     title: '',
@@ -117,13 +117,13 @@ function entriesOf(item: SurfaceItem, { nameOf }: Options): Entry[] {
                 })),
             ];
         case 'document':
-            return [own(blocksText(item.blocks))];
+            return [own(blocksText(card.blocks))];
         case 'board':
             return [
-                own(item.key),
-                ...item.issues.map((issue) => ({
+                own(card.key),
+                ...card.issues.map((issue) => ({
                     ...base,
-                    id: `${item.id}:${issue.id}`,
+                    id: `${card.id}:${issue.id}`,
                     subId: issue.id,
                     subLabel: issue.identifier,
                     title: issue.identifier,
@@ -133,23 +133,23 @@ function entriesOf(item: SurfaceItem, { nameOf }: Options): Entry[] {
         case 'pull-request':
             return [
                 own(
-                    `#${item.number} ${item.summary} ${item.branch} ${item.repo}`,
+                    `#${card.number} ${card.summary} ${card.branch} ${card.repo}`,
                 ),
             ];
         case 'chart':
-            return [own(item.caption)];
+            return [own(card.caption)];
         case 'video':
             return [own('')];
         case 'web':
-            return [own(item.url)];
+            return [own(card.url)];
         case 'image':
-            return [own(item.alt)];
+            return [own(card.alt)];
         case 'note':
-            return [own(item.text)];
+            return [own(card.text)];
         case 'sketch':
             return [own('')];
         case 'ui':
-            return [own(uiText(item.spec))];
+            return [own(uiText(card.spec))];
     }
 }
 
@@ -185,20 +185,17 @@ function snippetOf(
 }
 
 /**
- * An index over these items. Build it once per set of items (it's cheap
- * for a surface's worth) and search it as the query changes.
+ * An index over these cards. Build it once per set of cards (it's cheap
+ * for a room's worth) and search it as the query changes.
  */
-export function createSurfaceSearch(
-    items: SurfaceItem[],
-    options: Options = {},
-) {
+export function createRoomSearch(cards: Card[], options: Options = {}) {
     const index = new MiniSearch<Entry>({
         fields: ['title', 'text'],
         tokenize,
         storeFields: [
-            'itemId',
+            'cardId',
             'kind',
-            'itemTitle',
+            'cardTitle',
             'subId',
             'subLabel',
             'title',
@@ -211,11 +208,11 @@ export function createSurfaceSearch(
             combineWith: 'AND',
         },
     });
-    index.addAll(items.flatMap((item) => entriesOf(item, options)));
+    index.addAll(cards.flatMap((card) => entriesOf(card, options)));
 
     return {
-        search(query: string, limit = SEARCH_LIMIT): SurfaceSearchResult {
-            if (!query.trim()) return { hits: [], itemIds: new Set() };
+        search(query: string, limit = SEARCH_LIMIT): RoomSearchResult {
+            if (!query.trim()) return { hits: [], cardIds: new Set() };
             const results = index.search(query);
             const best = new Map<string, SearchHit>();
             for (const result of results) {
@@ -223,15 +220,15 @@ export function createSurfaceSearch(
                     score: number;
                     terms: string[];
                 };
-                if (best.has(entry.itemId)) continue;
+                if (best.has(entry.cardId)) continue;
                 const terms = entry.terms.map((term) => term.toLowerCase());
                 const body = entry.subId
                     ? entry.text
-                    : entry.text || entry.itemTitle;
-                best.set(entry.itemId, {
-                    itemId: entry.itemId,
+                    : entry.text || entry.cardTitle;
+                best.set(entry.cardId, {
+                    cardId: entry.cardId,
                     kind: entry.kind,
-                    title: entry.itemTitle,
+                    title: entry.cardTitle,
                     ...(entry.subId
                         ? { subId: entry.subId, subLabel: entry.subLabel }
                         : {}),
@@ -241,7 +238,7 @@ export function createSurfaceSearch(
             }
             return {
                 hits: [...best.values()].slice(0, limit),
-                itemIds: new Set(best.keys()),
+                cardIds: new Set(best.keys()),
             };
         },
     };

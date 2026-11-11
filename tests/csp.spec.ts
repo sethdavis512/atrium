@@ -67,7 +67,7 @@ test.describe('Content Security Policy', () => {
         await loadAndCheck(page, '/login');
     });
 
-    test('surface loads without CSP violations', async ({ authedPage }) => {
+    test('room loads without CSP violations', async ({ authedPage }) => {
         await loadAndCheck(authedPage, '/');
     });
 

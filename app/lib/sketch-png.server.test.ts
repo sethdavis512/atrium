@@ -1,7 +1,7 @@
 import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { encodePng, rasterizeSketch, sketchPng } from './sketch-png.server';
-import { SKETCH_SIZE, type SketchStroke } from './surface';
+import { SKETCH_SIZE, type SketchStroke } from './room';
 
 const across: SketchStroke = {
     color: '#ff0000',

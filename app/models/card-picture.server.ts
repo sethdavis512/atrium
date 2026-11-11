@@ -1,6 +1,6 @@
 import { sketchPng } from '~/lib/sketch-png.server';
-import type { SurfaceItem } from '~/lib/surface';
-import { SurfaceError } from './surface.server';
+import type { Card } from '~/lib/room';
+import { RoomError } from './room.server';
 
 /**
  * What a card looks like, for agents that read pictures: a sketch drawn as
@@ -10,15 +10,15 @@ import { SurfaceError } from './surface.server';
 export type CardPicture =
     { mediaType: 'image/png'; data: string } | { url: string; alt: string };
 
-export function pictureOf(item: SurfaceItem): CardPicture {
-    if (item.kind === 'sketch') {
+export function pictureOf(card: Card): CardPicture {
+    if (card.kind === 'sketch') {
         return {
             mediaType: 'image/png',
-            data: sketchPng(item.strokes).toString('base64'),
+            data: sketchPng(card.strokes).toString('base64'),
         };
     }
-    if (item.kind === 'image') return { url: item.src, alt: item.alt };
-    throw new SurfaceError(
-        `"${item.title}" is a ${item.kind}: only sketches and images have a picture to look at. Read it instead.`,
+    if (card.kind === 'image') return { url: card.src, alt: card.alt };
+    throw new RoomError(
+        `"${card.title}" is a ${card.kind}: only sketches and images have a picture to look at. Read it instead.`,
     );
 }

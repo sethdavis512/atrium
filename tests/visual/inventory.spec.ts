@@ -8,7 +8,7 @@ import {
 } from './helpers';
 
 /**
- * Visual inventory: one screenshot per major surface/state, written to
+ * Visual inventory: one screenshot per major room/state, written to
  * test-results/visual-inventory/ and attached to the HTML report (which
  * doubles as a browsable gallery). Runs only via `bun run test:visual`; the
  * default e2e projects ignore tests/visual/.
@@ -63,7 +63,7 @@ test.describe('logged out', () => {
     });
 });
 
-test.describe('surface', () => {
+test.describe('room', () => {
     for (const theme of ['light', 'dark'] as const) {
         test(`canvas, ${theme}`, async ({ browser }, testInfo) => {
             const context = await createVisualContext(
@@ -73,12 +73,12 @@ test.describe('surface', () => {
             );
             await setTheme(context, theme);
             const page = await context.newPage();
-            await page.goto('/surfaces/atlas-launch');
+            await page.goto('/rooms/atlas-launch');
             await settle(page);
             await expect(
                 page.getByRole('application', { name: 'Atrium canvas' }),
             ).toBeVisible();
-            await snap(page, testInfo, `surface-${theme}`);
+            await snap(page, testInfo, `room-${theme}`);
             await context.close();
         });
     }
@@ -92,9 +92,9 @@ test.describe('surface', () => {
         await setTheme(context, 'light');
         const page = await context.newPage();
         await page.setViewportSize(MOBILE_VIEWPORT);
-        await page.goto('/surfaces/atlas-launch');
+        await page.goto('/rooms/atlas-launch');
         await settle(page);
-        await snap(page, testInfo, 'surface-mobile');
+        await snap(page, testInfo, 'room-mobile');
         await context.close();
     });
 });

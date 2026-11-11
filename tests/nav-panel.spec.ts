@@ -1,11 +1,11 @@
 import type { Page } from '@playwright/test';
 import { test, expect, waitForHydration } from './fixtures';
 
-const SURFACE = '/surfaces/atlas-launch';
+const ROOM = '/rooms/atlas-launch';
 
 function navWidth(page: Page) {
     return page
-        .locator('[data-panel][id="surface-nav"]')
+        .locator('[data-panel][id="room-nav"]')
         .evaluate((el) => Math.round(el.getBoundingClientRect().width));
 }
 
@@ -13,7 +13,7 @@ test.describe('Left nav panel', () => {
     test('collapses to an icon rail that still gets you around, and stays that way', async ({
         authedPage: page,
     }) => {
-        await page.goto(SURFACE);
+        await page.goto(ROOM);
         await waitForHydration(page);
         expect(await navWidth(page)).toBe(256);
 
@@ -26,7 +26,7 @@ test.describe('Left nav panel', () => {
         await expect(page).toHaveURL(/\/cards\/doc-brief$/);
 
         // Rendered collapsed by the server on the next visit.
-        await page.goto(SURFACE);
+        await page.goto(ROOM);
         await waitForHydration(page);
         expect(await navWidth(page)).toBe(56);
         await page.getByRole('button', { name: 'Expand floor plan' }).click();
@@ -39,7 +39,7 @@ test.describe('Left nav panel', () => {
     test('drags wider, remembers it, and collapses when dragged narrow', async ({
         authedPage: page,
     }) => {
-        await page.goto(SURFACE);
+        await page.goto(ROOM);
         await waitForHydration(page);
         const handle = page.getByRole('separator', {
             name: 'Resize the floor plan',

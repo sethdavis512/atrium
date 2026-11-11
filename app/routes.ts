@@ -16,17 +16,17 @@ export default [
     route('/stop-impersonating', 'routes/stop-impersonating.tsx'),
     layout('routes/layouts/app.tsx', [
         index('routes/home.tsx'),
-        route('surfaces/:surfaceId', 'routes/surface.tsx', [
-            index('routes/surface-index.tsx'),
-            route('cards/:itemId', 'routes/surface-item.tsx'),
-            route('views/:viewId', 'routes/surface-view.tsx'),
+        route('rooms/:roomId', 'routes/room.tsx', [
+            index('routes/room-index.tsx'),
+            route('cards/:cardId', 'routes/room-card.tsx'),
+            route('views/:viewId', 'routes/room-view.tsx'),
         ]),
     ]),
     route('/healthcheck', 'routes/healthcheck.ts'),
     ...prefix('/api', [
         route('/auth/*', 'routes/api-auth.ts'),
         route('/mcp', 'routes/api-mcp.ts'),
-        route('/surfaces/:surfaceId/events', 'routes/api-surface-events.ts'),
+        route('/rooms/:roomId/events', 'routes/api-room-events.ts'),
         route('/agent-chat', 'routes/api-agent-chat.ts'),
         route('/theme', 'routes/api-theme.ts'),
         route('/test-mailbox', 'routes/api-test-mailbox.ts'),

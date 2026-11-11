@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { markdownToPortableText } from './portable-text';
-import { createSurfaceSearch } from './search';
-import type { BoardItem, SurfaceItem } from './surface';
+import { createRoomSearch } from './search';
+import type { BoardCard, Card } from './room';
 
-const items: SurfaceItem[] = [
+const cards: Card[] = [
     {
         kind: 'chat',
-        surfaceId: 's',
+        roomId: 's',
         id: 'chat-launch',
         title: 'Launch crew',
         participantIds: ['maya'],
@@ -28,7 +28,7 @@ const items: SurfaceItem[] = [
     },
     {
         kind: 'document',
-        surfaceId: 's',
+        roomId: 's',
         id: 'doc-sso',
         title: 'Northwind SSO questions',
         authorId: 'agent',
@@ -40,7 +40,7 @@ const items: SurfaceItem[] = [
     },
     {
         kind: 'board',
-        surfaceId: 's',
+        roomId: 's',
         id: 'board-atlas',
         title: 'Atlas launch',
         key: 'ATL',
@@ -61,14 +61,14 @@ const items: SurfaceItem[] = [
     },
 ];
 
-const search = createSurfaceSearch(items, {
+const search = createRoomSearch(cards, {
     nameOf: (id) => (id === 'maya' ? 'Maya Chen' : undefined),
 });
 
-describe('createSurfaceSearch', () => {
-    it('finds items by title first, by word prefix', () => {
+describe('createRoomSearch', () => {
+    it('finds cards by title first, by word prefix', () => {
         const { hits } = search.search('launc');
-        expect(hits.map((hit) => hit.itemId)).toEqual([
+        expect(hits.map((hit) => hit.cardId)).toEqual([
             'chat-launch',
             'board-atlas',
         ]);
@@ -78,22 +78,22 @@ describe('createSurfaceSearch', () => {
     it('points inside chats and boards, with who said it or which issue', () => {
         const message = search.search('timeline').hits[0]!;
         expect(message).toMatchObject({
-            itemId: 'chat-launch',
+            cardId: 'chat-launch',
             subId: 'm1',
             subLabel: 'Maya Chen',
         });
         const issue = search.search('rate limit').hits[0]!;
         expect(issue).toMatchObject({
-            itemId: 'board-atlas',
+            cardId: 'board-atlas',
             subId: 'i1',
             subLabel: 'ATL-3',
         });
     });
 
     it('ranks an exact identifier above longer ones it begins', () => {
-        const board = items[2] as BoardItem;
+        const board = cards[2] as BoardCard;
         const issue = board.issues[0]!;
-        const ten: BoardItem = {
+        const ten: BoardCard = {
             ...board,
             id: 'board-two',
             issues: [
@@ -101,14 +101,14 @@ describe('createSurfaceSearch', () => {
                 { ...issue, id: 'i1', identifier: 'ATL-1' },
             ],
         };
-        const hit = createSurfaceSearch([ten]).search('ATL-1').hits[0]!;
+        const hit = createRoomSearch([ten]).search('ATL-1').hits[0]!;
         expect(hit.subLabel).toBe('ATL-1');
     });
 
     it('needs every word, reads document text, and shrugs off a small typo', () => {
-        expect(search.search('flag fast').hits[0]?.itemId).toBe('doc-sso');
+        expect(search.search('flag fast').hits[0]?.cardId).toBe('doc-sso');
         expect(search.search('flag timeline').hits).toEqual([]);
-        expect(search.search('folow').hits[0]?.itemId).toBe('doc-sso');
+        expect(search.search('folow').hits[0]?.cardId).toBe('doc-sso');
     });
 
     it('marks the matched words in a snippet around them', () => {
@@ -117,8 +117,8 @@ describe('createSurfaceSearch', () => {
         expect(hit.snippet.slice(start, end)).toBe('flag');
     });
 
-    it('lists every matching item, and nothing for an empty query', () => {
-        expect(search.search('api').itemIds).toEqual(
+    it('lists every matching card, and nothing for an empty query', () => {
+        expect(search.search('api').cardIds).toEqual(
             new Set(['chat-launch', 'board-atlas']),
         );
         expect(search.search('  ').hits).toEqual([]);

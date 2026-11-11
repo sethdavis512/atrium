@@ -7,7 +7,7 @@ import {
 } from './fixtures';
 
 /**
- * Two people on one surface at once: each sees who else is here, and what
+ * Two people in one room at once: each sees who else is here, and what
  * one does reaches the other through the event stream (no reload, and
  * faster than the fallback poll).
  */
@@ -45,12 +45,12 @@ test.describe('Multiplayer', () => {
         browser: Parameters<Parameters<typeof test>[2]>[0]['browser'],
         baseURL: string,
         tag: string,
-        surfaceId: string,
+        roomId: string,
     ) {
         const context = await createAuthedContext(browser, baseURL, tag);
         contexts.push(context);
         const page = await context.newPage();
-        await page.goto(`/surfaces/${surfaceId}`);
+        await page.goto(`/rooms/${roomId}`);
         await waitForHydration(page);
         return page;
     }
@@ -65,13 +65,13 @@ test.describe('Multiplayer', () => {
 
         const setup = await createAuthedContext(browser, baseURL, 'setup');
         contexts.push(setup);
-        const surface = await mcp(await setup.newPage(), 'create_room', {
+        const room = await mcp(await setup.newPage(), 'create_room', {
             spaceId: 'product',
             name: `Together ${run}`,
         });
 
-        const annPage = await openAs(browser, baseURL, ann, surface.id);
-        const benPage = await openAs(browser, baseURL, ben, surface.id);
+        const annPage = await openAs(browser, baseURL, ann, room.id);
+        const benPage = await openAs(browser, baseURL, ben, room.id);
 
         // Each sees both, the other first.
         await expect(presence(annPage)).toHaveAccessibleName(
@@ -118,16 +118,16 @@ test.describe('Multiplayer', () => {
     test('an agent’s change shows up without a reload', async ({
         authedPage: page,
     }) => {
-        const surface = await mcp(page, 'create_room', {
+        const room = await mcp(page, 'create_room', {
             spaceId: 'product',
             name: `Agent ${crypto.randomUUID().slice(0, 6)}`,
         });
-        await page.goto(`/surfaces/${surface.id}`);
+        await page.goto(`/rooms/${room.id}`);
         await waitForHydration(page);
         await expect(presence(page)).toBeVisible();
 
         await mcp(page, 'add_note', {
-            surfaceId: surface.id,
+            roomId: room.id,
             text: 'Pushed by the agent',
         });
         await expect(

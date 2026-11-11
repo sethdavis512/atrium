@@ -10,7 +10,7 @@ const { env } = vi.hoisted(() => ({
 vi.mock('~/lib/env.server', () => ({ env }));
 
 import type { SessionUser } from '~/context';
-import { getSurfaceForUser, resetSurface } from '~/models/surface.server';
+import { getRoomForUser, resetRoom } from '~/models/room.server';
 import { action } from './api-mcp';
 import type { Route } from './+types/api-mcp';
 
@@ -51,13 +51,13 @@ async function callTool(
 }
 
 beforeEach(() => {
-    resetSurface();
+    resetRoom();
     env.NODE_ENV = 'development';
     env.MCP_API_KEY = undefined;
 });
 
 describe('/api/mcp', () => {
-    it('lists the surface tools', async () => {
+    it('lists the room tools', async () => {
         const response = await rpc('tools/list');
         expect(response.status).toBe(200);
         const { result } = await response.json();
@@ -73,7 +73,7 @@ describe('/api/mcp', () => {
 
     it('resizes chats, clamped, and refuses other cards', async () => {
         const resized = await callTool('resize_card', {
-            itemId: 'chat-launch',
+            cardId: 'chat-launch',
             width: 5000,
             height: 700,
         });
@@ -84,7 +84,7 @@ describe('/api/mcp', () => {
             height: 700,
         });
         const refused = await callTool('resize_card', {
-            itemId: 'doc-brief',
+            cardId: 'doc-brief',
             width: 1000,
             height: 600,
         });
@@ -93,29 +93,29 @@ describe('/api/mcp', () => {
 
     it('creates a document an agent can then read back', async () => {
         const created = await callTool('create_document', {
-            surfaceId: 'atlas-launch',
+            roomId: 'atlas-launch',
             title: 'Roadmap',
             markdown: 'Q1 goals',
         });
         const doc = JSON.parse(created.content[0]!.text);
         expect(doc.url).toBe(
-            `http://localhost:5173/surfaces/atlas-launch/cards/${doc.id}`,
+            `http://localhost:5173/rooms/atlas-launch/cards/${doc.id}`,
         );
 
-        const items = await callTool('list_cards', {});
-        expect(JSON.parse(items.content[0]!.text)).toContainEqual({
+        const cards = await callTool('list_cards', {});
+        expect(JSON.parse(cards.content[0]!.text)).toContainEqual({
             id: doc.id,
             kind: 'document',
             title: 'Roadmap',
-            surfaceId: 'atlas-launch',
+            roomId: 'atlas-launch',
         });
     });
 
     it('writes documents from Markdown and reads them back as Markdown', async () => {
         const markdown =
-            '## Plan\n\nAsk [Rosa](item:chat-customers) about **SSO**.\n\n![](item:board-atlas)';
+            '## Plan\n\nAsk [Rosa](card:chat-customers) about **SSO**.\n\n![](card:board-atlas)';
         const created = await callTool('create_document', {
-            surfaceId: 'atlas-launch',
+            roomId: 'atlas-launch',
             title: 'Linked',
             markdown,
         });
@@ -127,18 +127,18 @@ describe('/api/mcp', () => {
             documentId: doc.id,
             markdown: '- One more',
         });
-        const read = await callTool('get_card', { itemId: doc.id });
+        const read = await callTool('get_card', { cardId: doc.id });
         expect(JSON.parse(read.content[0]!.text).markdown).toBe(
             `${markdown}\n\n- One more`,
         );
 
         const bad = await callTool('create_document', {
-            surfaceId: 'atlas-launch',
+            roomId: 'atlas-launch',
             title: 'Broken',
-            markdown: '[gone](item:missing)',
+            markdown: '[gone](card:missing)',
         });
         expect(bad.isError).toBe(true);
-        expect(bad.content[0]!.text).toMatch(/No item/);
+        expect(bad.content[0]!.text).toMatch(/No card/);
     });
 
     it('adds YouTube videos and web pages, and moves a page elsewhere', async () => {
@@ -154,13 +154,13 @@ describe('/api/mcp', () => {
         expect(video).toMatchObject({
             kind: 'video',
             videoId: 'MnrJzXM7a6o',
-            url: `http://localhost:5173/surfaces/atlas-launch/cards/${video.id}`,
+            url: `http://localhost:5173/rooms/atlas-launch/cards/${video.id}`,
         });
 
         const page = JSON.parse(
             (
                 await callTool('add_web_page', {
-                    surfaceId: 'atlas-launch',
+                    roomId: 'atlas-launch',
                     url: 'example.com',
                     title: 'Ex',
                 })
@@ -169,7 +169,7 @@ describe('/api/mcp', () => {
         expect(page).toMatchObject({
             kind: 'web',
             url: 'https://example.com/',
-            link: `http://localhost:5173/surfaces/atlas-launch/cards/${page.id}`,
+            link: `http://localhost:5173/rooms/atlas-launch/cards/${page.id}`,
         });
         const moved = JSON.parse(
             (
@@ -184,7 +184,7 @@ describe('/api/mcp', () => {
         const image = JSON.parse(
             (
                 await callTool('add_image', {
-                    surfaceId: 'atlas-launch',
+                    roomId: 'atlas-launch',
                     url: 'https://example.com/loop.gif',
                     title: 'Loop',
                     alt: 'A loop',
@@ -194,30 +194,30 @@ describe('/api/mcp', () => {
         expect(image).toMatchObject({ kind: 'image', animated: true });
 
         const copy = JSON.parse(
-            (await callTool('duplicate_card', { itemId: image.id })).content[0]!
+            (await callTool('duplicate_card', { cardId: image.id })).content[0]!
                 .text,
         );
         expect(copy).toMatchObject({ kind: 'image', title: 'Loop (copy)' });
 
         const bad = await callTool('add_video', {
-            surfaceId: 'atlas-launch',
+            roomId: 'atlas-launch',
             url: 'https://vimeo.com/1',
             title: 'Nope',
         });
         expect(bad.isError).toBe(true);
     });
 
-    it('searches messages, issues, and documents, pointing inside windows', async () => {
+    it('searches messages, issues, and documents, pointing inside cards', async () => {
         const result = await callTool('search', { query: 'fast follow' });
-        const hits: { itemId: string; snippet: string }[] = JSON.parse(
+        const hits: { cardId: string; snippet: string }[] = JSON.parse(
             result.content[0]!.text,
         );
         // The pull request's title says it too, and titles count most.
-        expect(hits[0]!.itemId).toBe('pr-sso-flag');
-        const doc = hits.find((hit) => hit.itemId === 'doc-sso-notes');
+        expect(hits[0]!.cardId).toBe('pr-sso-flag');
+        const doc = hits.find((hit) => hit.cardId === 'doc-sso-notes');
         expect(doc).toMatchObject({
             kind: 'document',
-            url: 'http://localhost:5173/surfaces/atlas-launch/cards/doc-sso-notes',
+            url: 'http://localhost:5173/rooms/atlas-launch/cards/doc-sso-notes',
         });
         expect(doc!.snippet).toMatch(/fast follow/i);
         expect(doc).not.toHaveProperty('ranges');
@@ -228,7 +228,7 @@ describe('/api/mcp', () => {
         expect(issue).toMatchObject({ kind: 'board', subLabel: 'ATL-13' });
     });
 
-    it('lists spaces and surfaces, starts new ones, and keeps cards on theirs', async () => {
+    it('lists spaces and rooms, starts new ones, and keeps cards on theirs', async () => {
         const spaces = JSON.parse(
             (await callTool('list_spaces', {})).content[0]!.text,
         );
@@ -238,15 +238,15 @@ describe('/api/mcp', () => {
             'design',
             'playground',
         ]);
-        expect(spaces[0].surfaces[0]).toMatchObject({
+        expect(spaces[0].rooms[0]).toMatchObject({
             id: 'atlas-launch',
-            url: 'http://localhost:5173/surfaces/atlas-launch',
+            url: 'http://localhost:5173/rooms/atlas-launch',
         });
 
         const space = JSON.parse(
             (await callTool('create_space', { name: 'Ops' })).content[0]!.text,
         );
-        const surface = JSON.parse(
+        const room = JSON.parse(
             (
                 await callTool('create_room', {
                     spaceId: space.id,
@@ -254,37 +254,37 @@ describe('/api/mcp', () => {
                 })
             ).content[0]!.text,
         );
-        // Every new surface starts with a chat with the agent.
-        expect(surface).toMatchObject({ cardCount: 1, spaceId: space.id });
+        // Every new room starts with a chat with the agent.
+        expect(room).toMatchObject({ cardCount: 1, spaceId: space.id });
         await callTool('create_chat', {
-            surfaceId: surface.id,
+            roomId: room.id,
             title: 'Pager',
         });
         const onCall = JSON.parse(
-            (await callTool('list_cards', { surfaceId: surface.id }))
-                .content[0]!.text,
+            (await callTool('list_cards', { roomId: room.id })).content[0]!
+                .text,
         );
         expect(onCall.map((card: { title: string }) => card.title)).toEqual([
             'Ask the Concierge',
             'Pager',
         ]);
 
-        // Cards and links stay within one surface.
+        // Cards and links stay within one room.
         const crossLink = await callTool('link_cards', {
             from: onCall[1].id,
             to: 'doc-brief',
             label: 'about',
         });
         expect(crossLink.isError).toBe(true);
-        const noSurface = await callTool('create_chat', { title: 'Lost' });
-        expect(noSurface.isError).toBe(true);
+        const noRoom = await callTool('create_chat', { title: 'Lost' });
+        expect(noRoom.isError).toBe(true);
     });
 
     it('shows a sketch as a PNG and an image as its address, nothing else', async () => {
         const sketch = JSON.parse(
             (
                 await callTool('add_sketch', {
-                    surfaceId: 'atlas-launch',
+                    roomId: 'atlas-launch',
                     title: 'Wireframe',
                     strokes: [
                         {
@@ -297,7 +297,7 @@ describe('/api/mcp', () => {
             ).content[0]!.text,
         );
         const looked = (await callTool('look_at_card', {
-            itemId: sketch.id,
+            cardId: sketch.id,
         })) as unknown as {
             content: {
                 type: string;
@@ -321,35 +321,35 @@ describe('/api/mcp', () => {
         ).toBe('PNG');
 
         const image = await callTool('look_at_card', {
-            itemId: 'image-iphone',
+            cardId: 'image-iphone',
         });
         expect(JSON.parse(image.content[0]!.text)).toMatchObject({
             src: expect.stringMatching(/^https:/),
         });
 
-        const doc = await callTool('look_at_card', { itemId: 'doc-brief' });
+        const doc = await callTool('look_at_card', { cardId: 'doc-brief' });
         expect(doc.isError).toBe(true);
         expect(doc.content[0]!.text).toMatch(/only sketches and images/);
     });
 
     it('reports store errors as tool errors', async () => {
-        const result = await callTool('get_card', { itemId: 'missing' });
+        const result = await callTool('get_card', { cardId: 'missing' });
         expect(result.isError).toBe(true);
-        expect(result.content[0]!.text).toMatch(/No item/);
+        expect(result.content[0]!.text).toMatch(/No card/);
     });
 
-    it('saves a view framing items, lists it, and deletes it', async () => {
+    it('saves a view framing cards, lists it, and deletes it', async () => {
         const saved = await callTool('save_view', {
-            surfaceId: 'atlas-launch',
+            roomId: 'atlas-launch',
             name: 'Launch chat',
-            itemIds: ['chat-launch'],
+            cardIds: ['chat-launch'],
         });
         const view = JSON.parse(saved.content[0]!.text);
         expect(view).toMatchObject({
             name: 'Launch chat',
-            itemIds: ['chat-launch'],
+            cardIds: ['chat-launch'],
             center: { x: 180, y: 320 },
-            url: `http://localhost:5173/surfaces/atlas-launch/views/${view.id}`,
+            url: `http://localhost:5173/rooms/atlas-launch/views/${view.id}`,
         });
 
         const listed = await callTool('list_views', {});
@@ -362,7 +362,7 @@ describe('/api/mcp', () => {
 
     it('saves a view at an exact spot, and refuses one with neither', async () => {
         const saved = await callTool('save_view', {
-            surfaceId: 'atlas-launch',
+            roomId: 'atlas-launch',
             name: 'Here',
             center: { x: 10, y: 20 },
             zoom: 0.5,
@@ -373,59 +373,59 @@ describe('/api/mcp', () => {
         });
 
         const refused = await callTool('save_view', {
-            surfaceId: 'atlas-launch',
+            roomId: 'atlas-launch',
             name: 'Nowhere',
         });
         expect(refused.isError).toBe(true);
 
         const unknown = await callTool('save_view', {
-            surfaceId: 'atlas-launch',
+            roomId: 'atlas-launch',
             name: 'Ghosts',
-            itemIds: ['missing'],
+            cardIds: ['missing'],
         });
         expect(unknown.isError).toBe(true);
     });
 
-    it('colors and restacks windows the app then shows', async () => {
+    it('colors and restacks cards the app then shows', async () => {
         await callTool('set_card_color', {
-            itemId: 'doc-brief',
+            cardId: 'doc-brief',
             color: 'sky',
         });
         const restacked = await callTool('restack_card', {
-            itemId: 'chat-launch',
+            cardId: 'chat-launch',
             to: 'front',
         });
         expect(JSON.parse(restacked.content[0]!.text).stack.at(-1)).toBe(
             'chat-launch',
         );
 
-        const { arrangement } = await getSurfaceForUser(
+        const { arrangement } = await getRoomForUser(
             {
                 name: 'A',
                 email: 'a@example.test',
             } as SessionUser,
             'atlas-launch',
-        ).then((surface) => surface!);
+        ).then((room) => room!);
         expect(arrangement.colors).toEqual({ 'doc-brief': 'sky' });
         expect(arrangement.stack.at(-1)).toBe('chat-launch');
 
         await callTool('set_card_color', {
-            itemId: 'doc-brief',
+            cardId: 'doc-brief',
             color: null,
         });
-        const cleared = await getSurfaceForUser(
+        const cleared = await getRoomForUser(
             {
                 name: 'A',
                 email: 'a@example.test',
             } as SessionUser,
             'atlas-launch',
-        ).then((surface) => surface!);
+        ).then((room) => room!);
         expect(cleared.arrangement.colors).toEqual({});
     });
 
     it('rejects colors outside the palette', async () => {
         const result = await callTool('set_card_color', {
-            itemId: 'doc-brief',
+            cardId: 'doc-brief',
             color: 'chartreuse',
         });
         expect(result.isError).toBe(true);
@@ -449,7 +449,7 @@ describe('/api/mcp', () => {
         });
 
         const chat = JSON.parse(
-            (await callTool('get_card', { itemId: 'chat-launch' })).content[0]!
+            (await callTool('get_card', { cardId: 'chat-launch' })).content[0]!
                 .text,
         );
         expect(chat.messages.at(-1).text).toMatch(/Opened #496/);
@@ -504,7 +504,7 @@ describe('/api/mcp', () => {
         const board = JSON.parse(
             (
                 await callTool('create_board', {
-                    surfaceId: 'atlas-launch',
+                    roomId: 'atlas-launch',
                     title: 'Billing',
                     key: 'bil',
                 })
@@ -541,7 +541,7 @@ describe('/api/mcp', () => {
         expect(moved.status).toBe('in_progress');
 
         const badKey = await callTool('create_board', {
-            surfaceId: 'atlas-launch',
+            roomId: 'atlas-launch',
             title: 'x',
             key: 'way-too-long',
         });

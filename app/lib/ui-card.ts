@@ -5,17 +5,17 @@ import {
     ISSUE_STATUSES,
     type IssueStatus,
     type Person,
-    type SurfaceItem,
-} from './surface';
+    type Card,
+} from './room';
 
 /**
  * UI cards: small interfaces an agent composes from a fixed catalog of
  * components (json-render, https://json-render.dev), drawn with the app's
  * own components. A card stores only its spec (which components, how they
- * nest, where their values come from). The numbers come from the surface:
- * specs read live surface data through `$state` paths (`uiData`), so an
+ * nest, where their values come from). The numbers come from the room:
+ * specs read live room data through `$state` paths (`uiData`), so an
  * agent picks what to show and never writes the figures itself. Buttons
- * run the catalog's actions, which are the surface's own changes (move an
+ * run the catalog's actions, which are the room's own changes (move an
  * issue, merge a pull request), made as whoever clicks.
  *
  * Client-safe: the card draws with it, and the store and agents validate
@@ -231,38 +231,38 @@ const STATUS_LABELS: Record<IssueStatus, string> = {
 
 /**
  * What a UI card's spec can read, at these `$state` paths. Shared by every
- * viewer and rebuilt from the surface on each change, so bound values stay
+ * viewer and rebuilt from the room on each change, so bound values stay
  * live. A spec keeps its own state (inputs, tabs) under `/ui`.
  */
 export function uiData(
-    items: SurfaceItem[],
+    cards: Card[],
     people: Person[],
     meId: string,
 ): Record<string, unknown> {
     const nameOf = (id: string | undefined) =>
         (id && people.find((person) => person.id === id)?.name) || '';
-    const boards = items.flatMap((item) =>
-        item.kind === 'board'
+    const boards = cards.flatMap((card) =>
+        card.kind === 'board'
             ? [
                   {
-                      id: item.id,
-                      title: item.title,
-                      key: item.key,
-                      open: item.issues.filter((i) => i.status !== 'done')
+                      id: card.id,
+                      title: card.title,
+                      key: card.key,
+                      open: card.issues.filter((i) => i.status !== 'done')
                           .length,
-                      done: item.issues.filter((i) => i.status === 'done')
+                      done: card.issues.filter((i) => i.status === 'done')
                           .length,
-                      total: item.issues.length,
+                      total: card.issues.length,
                       byStatus: ISSUE_STATUSES.map((status) => ({
                           status,
                           label: STATUS_LABELS[status],
-                          value: item.issues.filter(
+                          value: card.issues.filter(
                               (issue) => issue.status === status,
                           ).length,
                       })),
-                      issues: item.issues.map((issue) => ({
+                      issues: card.issues.map((issue) => ({
                           id: issue.id,
-                          boardId: item.id,
+                          boardId: card.id,
                           identifier: issue.identifier,
                           title: issue.title,
                           status: issue.status,
@@ -275,17 +275,17 @@ export function uiData(
               ]
             : [],
     );
-    const pullRequests = items.flatMap((item) =>
-        item.kind === 'pull-request'
+    const pullRequests = cards.flatMap((card) =>
+        card.kind === 'pull-request'
             ? [
                   {
-                      id: item.id,
-                      number: item.number,
-                      title: item.title,
-                      status: item.status,
-                      branch: item.branch,
-                      chatId: item.chatId ?? '',
-                      author: nameOf(item.authorId),
+                      id: card.id,
+                      number: card.number,
+                      title: card.title,
+                      status: card.status,
+                      branch: card.branch,
+                      chatId: card.chatId ?? '',
+                      author: nameOf(card.authorId),
                   },
               ]
             : [],
@@ -298,68 +298,68 @@ export function uiData(
             name,
             initials,
         })),
-        cards: items.map((item) => ({
-            id: item.id,
-            kind: item.kind,
-            title: item.title,
-            createdBy: nameOf(item.createdById),
+        cards: cards.map((card) => ({
+            id: card.id,
+            kind: card.kind,
+            title: card.title,
+            createdBy: nameOf(card.createdById),
         })),
         boards,
         boardById: Object.fromEntries(boards.map((board) => [board.id, board])),
         pullRequests,
-        chats: items.flatMap((item) =>
-            item.kind === 'chat'
+        chats: cards.flatMap((card) =>
+            card.kind === 'chat'
                 ? [
                       {
-                          id: item.id,
-                          title: item.title,
-                          messages: item.messages.length,
-                          last: item.messages.at(-1)?.text ?? '',
+                          id: card.id,
+                          title: card.title,
+                          messages: card.messages.length,
+                          last: card.messages.at(-1)?.text ?? '',
                       },
                   ]
                 : [],
         ),
-        documents: items.flatMap((item) =>
-            item.kind === 'document'
-                ? [{ id: item.id, title: item.title }]
+        documents: cards.flatMap((card) =>
+            card.kind === 'document'
+                ? [{ id: card.id, title: card.title }]
                 : [],
         ),
-        charts: items.flatMap((item) =>
-            item.kind === 'chart'
+        charts: cards.flatMap((card) =>
+            card.kind === 'chart'
                 ? [
                       {
-                          id: item.id,
-                          title: item.title,
-                          unit: item.unit,
-                          points: item.points,
+                          id: card.id,
+                          title: card.title,
+                          unit: card.unit,
+                          points: card.points,
                       },
                   ]
                 : [],
         ),
         chartById: Object.fromEntries(
-            items.flatMap((item) =>
-                item.kind === 'chart'
+            cards.flatMap((card) =>
+                card.kind === 'chart'
                     ? [
                           [
-                              item.id,
+                              card.id,
                               {
-                                  id: item.id,
-                                  title: item.title,
-                                  unit: item.unit,
-                                  points: item.points,
+                                  id: card.id,
+                                  title: card.title,
+                                  unit: card.unit,
+                                  points: card.points,
                               },
                           ],
                       ]
                     : [],
             ),
         ),
-        notes: items.flatMap((item) =>
-            item.kind === 'note'
-                ? [{ id: item.id, title: item.title, text: item.text }]
+        notes: cards.flatMap((card) =>
+            card.kind === 'note'
+                ? [{ id: card.id, title: card.title, text: card.text }]
                 : [],
         ),
         stats: {
-            cards: items.length,
+            cards: cards.length,
             openIssues: issues.filter((issue) => issue.status !== 'done')
                 .length,
             doneIssues: issues.filter((issue) => issue.status === 'done')

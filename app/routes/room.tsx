@@ -1,0 +1,945 @@
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useSyncExternalStore,
+} from 'react';
+import { ArrowLeftIcon, PanelLeftCloseIcon, SearchIcon } from 'lucide-react';
+import {
+    data,
+    redirect,
+    isRouteErrorResponse,
+    Link,
+    Outlet,
+    useLocation,
+    useFetchers,
+    useParams,
+    useRevalidator,
+    type ShouldRevalidateFunctionArgs,
+} from 'react-router';
+import { z } from 'zod';
+import { TrellisProvider } from '@sethdavis512/trellis';
+import trellisStyles from '@sethdavis512/trellis/style.css?url';
+import { RoomCanvas } from '~/components/room/RoomCanvas';
+import { AddCardProvider } from '~/components/room/AddCard';
+import { SearchPalette } from '~/components/room/SearchPalette';
+import { NavRail } from '~/components/room/NavRail';
+import { ResizableNav, useNavRail } from '~/components/room/ResizableNav';
+import { RoomNav } from '~/components/room/RoomNav';
+import { RoomSwitcher } from '~/components/room/RoomSwitcher';
+import { Button } from '~/components/ui/button';
+import { APP_NAME } from '~/config';
+import { requireUserFromContext } from '~/context';
+import { env } from '~/lib/env.server';
+import { authMiddleware } from '~/middleware/auth';
+import {
+    completeNavOrder,
+    navCollapsedSchema,
+    navOrderSchema,
+} from '~/lib/nav-order';
+import { documentBlocksSchema } from '~/lib/portable-text';
+import { sketchStrokesSchema } from '~/lib/sketch';
+import { readNavPanel } from '~/lib/nav-panel';
+import { canvasSettingsSchema } from '~/lib/canvas-settings';
+import {
+    getCanvasSettings,
+    serializeCanvasSettings,
+} from '~/lib/canvas-settings.server';
+import {
+    getNavCollapsed,
+    getNavOrder,
+    serializeNavCollapsed,
+    serializeNavOrder,
+} from '~/lib/nav-order.server';
+import { markChanged, type RoomEvent } from '~/models/room-events.server';
+import {
+    RoomConflictError,
+    RoomError,
+    createIssue,
+    getRoomForUser,
+    rememberPerson,
+    roomVersion,
+    moveCards,
+    addCard,
+    updateNote,
+    updateSketch,
+    setCardLocked,
+    linkCards,
+    unlinkRelation,
+    commentOnIssue,
+    duplicateCard,
+    renameCard,
+    resizeCard,
+    deleteCard,
+    navigateWebPage,
+    resetCardPositions,
+    arrangeByLinks,
+    postMessage,
+    deleteView,
+    restackCard,
+    saveView,
+    setCardColor,
+    updateDocument,
+    setPullRequestStatus,
+    updateIssue,
+} from '~/models/room.server';
+import {
+    ISSUE_PRIORITIES,
+    ISSUE_STATUSES,
+    TITLE_MAX,
+    CARD_COLOR_NAMES,
+    cardPath,
+    pushRecent,
+    type Person,
+    type Card,
+} from '~/lib/room';
+import type { Route } from './+types/room';
+
+export const middleware: Route.MiddlewareFunction[] = [authMiddleware];
+
+export const links: Route.LinksFunction = () => [
+    { rel: 'stylesheet', href: trellisStyles },
+];
+
+/**
+ * Typing in the filter bar's search only changes `?q=`, which the canvas
+ * reads in the browser: no need to reload the room for it. Anything
+ * else (polling, actions, other URL changes) revalidates as usual.
+ */
+export function shouldRevalidate({
+    currentUrl,
+    nextUrl,
+    formMethod,
+    defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+    if (
+        (formMethod === undefined || formMethod === 'GET') &&
+        currentUrl.pathname === nextUrl.pathname &&
+        currentUrl.search !== nextUrl.search
+    ) {
+        const withoutQuery = (url: URL) => {
+            const params = new URLSearchParams(url.search);
+            params.delete('q');
+            return params.toString();
+        };
+        if (withoutQuery(currentUrl) === withoutQuery(nextUrl)) return false;
+    }
+    return defaultShouldRevalidate;
+}
+
+export async function loader({ request, context, params }: Route.LoaderArgs) {
+    const user = requireUserFromContext(context);
+    const room = await getRoomForUser(user, params.roomId);
+    if (!room) throw data('Room not found', { status: 404 });
+    return {
+        room,
+        version: roomVersion(params.roomId),
+        navOrder: await getNavOrder(request),
+        navCollapsed: await getNavCollapsed(request),
+        navPanel: readNavPanel(request.headers.get('Cookie')),
+        canvasSettings: await getCanvasSettings(request),
+        /** Agent chats answer for real (Claude) instead of from the mock. */
+        liveAgent: Boolean(env.ANTHROPIC_API_KEY),
+    };
+}
+
+const intentSchema = z.discriminatedUnion('intent', [
+    z.object({
+        intent: z.literal('post-message'),
+        chatId: z.string().min(1),
+        text: z.string().trim().min(1).max(4000),
+    }),
+    z.object({
+        intent: z.literal('restack'),
+        cardId: z.string().min(1),
+        to: z.enum(['front', 'back']),
+    }),
+    z.object({
+        intent: z.literal('save-view'),
+        name: z.string().trim().min(1).max(60),
+        x: z.coerce.number().finite(),
+        y: z.coerce.number().finite(),
+        zoom: z.coerce.number().positive().max(10),
+    }),
+    z.object({
+        intent: z.literal('delete-view'),
+        viewId: z.string().min(1),
+    }),
+    z.object({
+        intent: z.literal('set-pr-status'),
+        pullRequestId: z.string().min(1),
+        status: z.enum(['draft', 'open', 'merged', 'closed']),
+    }),
+    z.object({
+        intent: z.literal('move-issue'),
+        boardId: z.string().min(1),
+        issueId: z.string().min(1),
+        status: z.enum(ISSUE_STATUSES),
+        index: z.coerce.number().int().min(0).optional(),
+    }),
+    z.object({
+        intent: z.literal('edit-issue'),
+        boardId: z.string().min(1),
+        issueId: z.string().min(1),
+        title: z.string().trim().min(1).max(200).optional(),
+        description: z.string().max(10000).optional(),
+        priority: z.enum(ISSUE_PRIORITIES).optional(),
+        // '' unassigns.
+        assigneeId: z.string().optional(),
+    }),
+    z.object({
+        intent: z.literal('comment-issue'),
+        boardId: z.string().min(1),
+        issueId: z.string().min(1),
+        text: z.string().trim().min(1).max(4000),
+    }),
+    z.object({
+        intent: z.literal('create-issue'),
+        boardId: z.string().min(1),
+        title: z.string().trim().min(1).max(200),
+        status: z.enum(ISSUE_STATUSES),
+    }),
+    z.object({
+        intent: z.literal('update-document'),
+        documentId: z.string().min(1),
+        baseUpdatedAt: z.string().min(1),
+        blocks: z
+            .string()
+            .transform((raw, ctx) => {
+                try {
+                    return JSON.parse(raw) as unknown;
+                } catch {
+                    ctx.addIssue({ code: 'custom', message: 'Not JSON' });
+                    return z.NEVER;
+                }
+            })
+            .pipe(documentBlocksSchema),
+    }),
+    z.object({
+        intent: z.literal('create-card'),
+        kind: z.enum([
+            'chat',
+            'document',
+            'board',
+            'video',
+            'web',
+            'image',
+            'chart',
+            'pull-request',
+            'note',
+            'sketch',
+            'ui',
+        ]),
+        title: z.string().trim().max(160).optional(),
+        url: z.string().trim().max(2000).optional(),
+        attachedTo: z.string().min(1).optional(),
+        x: z.coerce.number().finite().optional(),
+        y: z.coerce.number().finite().optional(),
+    }),
+    z.object({
+        intent: z.literal('link-cards'),
+        from: z.string().min(1),
+        to: z.string().min(1),
+        label: z.string().trim().min(1).max(40).default('related'),
+    }),
+    z.object({
+        intent: z.literal('unlink-cards'),
+        relationId: z.string().min(1),
+    }),
+    z.object({
+        intent: z.literal('set-lock'),
+        cardId: z.string().min(1),
+        locked: z
+            .enum(['true', 'false'])
+            .transform((value) => value === 'true'),
+        x: z.coerce.number().finite().optional(),
+        y: z.coerce.number().finite().optional(),
+    }),
+    z.object({
+        intent: z.literal('update-note'),
+        noteId: z.string().min(1),
+        text: z.string().max(4000),
+    }),
+    z.object({
+        intent: z.literal('update-sketch'),
+        sketchId: z.string().min(1),
+        strokes: z
+            .string()
+            .max(500_000)
+            .transform((value, ctx) => {
+                try {
+                    return JSON.parse(value) as unknown;
+                } catch {
+                    ctx.addIssue({ code: 'custom', message: 'Not JSON' });
+                    return z.NEVER;
+                }
+            })
+            .pipe(sketchStrokesSchema),
+    }),
+    z.object({
+        intent: z.literal('delete-card'),
+        cardId: z.string().min(1),
+    }),
+    z.object({
+        intent: z.literal('rename-card'),
+        cardId: z.string().min(1),
+        title: z.string().trim().min(1).max(TITLE_MAX),
+    }),
+    z.object({
+        intent: z.literal('resize-card'),
+        cardId: z.string().min(1),
+        width: z.coerce.number().finite().positive(),
+        height: z.coerce.number().finite().positive(),
+        x: z.coerce.number().finite().optional(),
+        y: z.coerce.number().finite().optional(),
+    }),
+    z.object({
+        intent: z.literal('duplicate'),
+        cardId: z.string().min(1),
+        x: z.coerce.number().finite().optional(),
+        y: z.coerce.number().finite().optional(),
+    }),
+    z.object({
+        intent: z.literal('navigate-web'),
+        webId: z.string().min(1),
+        url: z.string().trim().min(1).max(2000),
+    }),
+    z.object({
+        intent: z.literal('move-cards'),
+        positions: z
+            .string()
+            .transform((raw, ctx) => {
+                try {
+                    return JSON.parse(raw) as unknown;
+                } catch {
+                    ctx.addIssue({ code: 'custom', message: 'Not JSON' });
+                    return z.NEVER;
+                }
+            })
+            .pipe(
+                z.record(
+                    z.string(),
+                    z.object({
+                        x: z.number().finite(),
+                        y: z.number().finite(),
+                    }),
+                ),
+            ),
+    }),
+    z.object({ intent: z.literal('reset-positions') }),
+    z.object({ intent: z.literal('arrange') }),
+    z.object({
+        intent: z.literal('set-nav-order'),
+        order: z
+            .string()
+            .transform((raw, ctx) => {
+                try {
+                    return JSON.parse(raw) as unknown;
+                } catch {
+                    ctx.addIssue({ code: 'custom', message: 'Not JSON' });
+                    return z.NEVER;
+                }
+            })
+            .pipe(navOrderSchema),
+    }),
+    z.object({
+        intent: z.literal('set-nav-collapsed'),
+        collapsed: z
+            .string()
+            .transform((raw, ctx) => {
+                try {
+                    return JSON.parse(raw) as unknown;
+                } catch {
+                    ctx.addIssue({ code: 'custom', message: 'Not JSON' });
+                    return z.NEVER;
+                }
+            })
+            .pipe(navCollapsedSchema),
+    }),
+    canvasSettingsSchema.extend({
+        intent: z.literal('set-canvas-settings'),
+    }),
+    z.object({
+        intent: z.literal('set-color'),
+        cardId: z.string().min(1),
+        // An empty color goes back to the default border.
+        color: z
+            .union([z.enum(CARD_COLOR_NAMES), z.literal('')])
+            .transform((color) => color || null),
+    }),
+]);
+
+/**
+ * The canvas's mutations: chat cards post messages, card controls
+ * restack and recolor, pull requests and issues move along, boards take new
+ * issues, and the nav saves and deletes views. All submit with fetchers (`action="/"`), so the page
+ * never navigates, and the loader re-runs to confirm.
+ */
+export async function action(args: Route.ActionArgs) {
+    try {
+        return await applyIntent(args);
+    } finally {
+        // Everyone else in the room hears about it from the event stream.
+        markChanged();
+    }
+}
+
+async function applyIntent({ request, context, params }: Route.ActionArgs) {
+    const me = rememberPerson(requireUserFromContext(context));
+    const parsed = intentSchema.safeParse(
+        Object.fromEntries(await request.formData()),
+    );
+    if (!parsed.success) {
+        return data({ error: 'That change was not valid.' }, { status: 400 });
+    }
+
+    const input = parsed.data;
+    // A new card: a document opens focused, ready to write in; anything
+    // else just appears where it was put.
+    if (input.intent === 'create-card') {
+        try {
+            const card = addCard({
+                roomId: params.roomId,
+                kind: input.kind,
+                title: input.title,
+                url: input.url,
+                attachedTo: input.attachedTo,
+                position:
+                    input.x === undefined || input.y === undefined
+                        ? undefined
+                        : { x: input.x, y: input.y },
+                authorId: me.id,
+            });
+            if (card.kind === 'document') {
+                throw redirect(cardPath(params.roomId, card.id));
+            }
+            return { error: null, createdId: card.id };
+        } catch (error) {
+            if (error instanceof RoomError) {
+                return data({ error: error.message }, { status: 400 });
+            }
+            throw error;
+        }
+    }
+    // Documents answer with their new version (the next save's base), or
+    // 409 when someone else saved first.
+    if (input.intent === 'update-document') {
+        try {
+            const doc = updateDocument({
+                documentId: input.documentId,
+                blocks: input.blocks,
+                baseUpdatedAt: input.baseUpdatedAt,
+                authorId: me.id,
+            });
+            return { error: null, updatedAt: doc.updatedAt };
+        } catch (error) {
+            if (error instanceof RoomConflictError) {
+                return data(
+                    { error: error.message, conflict: true },
+                    { status: 409 },
+                );
+            }
+            if (error instanceof RoomError) {
+                return data({ error: error.message }, { status: 404 });
+            }
+            throw error;
+        }
+    }
+    // The nav's order and collapsed sections are this person's, in cookies,
+    // not the shared store.
+    if (input.intent === 'set-nav-collapsed') {
+        return data(
+            { error: null },
+            {
+                headers: {
+                    'Set-Cookie': await serializeNavCollapsed(input.collapsed),
+                },
+            },
+        );
+    }
+    if (input.intent === 'set-canvas-settings') {
+        const { intent: _intent, ...settings } = input;
+        return data(
+            { error: null },
+            {
+                headers: {
+                    'Set-Cookie': await serializeCanvasSettings(settings),
+                },
+            },
+        );
+    }
+    if (input.intent === 'set-nav-order') {
+        return data(
+            { error: null },
+            {
+                headers: {
+                    'Set-Cookie': await serializeNavOrder(
+                        completeNavOrder(input.order),
+                    ),
+                },
+            },
+        );
+    }
+    try {
+        if (input.intent === 'post-message') {
+            postMessage({
+                chatId: input.chatId,
+                authorId: me.id,
+                text: input.text,
+            });
+        } else if (input.intent === 'save-view') {
+            saveView({
+                roomId: params.roomId,
+                name: input.name,
+                center: { x: input.x, y: input.y },
+                zoom: input.zoom,
+            });
+        } else if (input.intent === 'delete-view') {
+            deleteView(input.viewId);
+        } else if (input.intent === 'set-pr-status') {
+            setPullRequestStatus(input.pullRequestId, input.status);
+        } else if (input.intent === 'edit-issue') {
+            updateIssue({
+                boardId: input.boardId,
+                issueId: input.issueId,
+                title: input.title,
+                description: input.description,
+                priority: input.priority,
+                assigneeId:
+                    input.assigneeId === undefined
+                        ? undefined
+                        : input.assigneeId || null,
+            });
+        } else if (input.intent === 'comment-issue') {
+            commentOnIssue({
+                boardId: input.boardId,
+                issueId: input.issueId,
+                text: input.text,
+                authorId: me.id,
+            });
+        } else if (input.intent === 'move-issue') {
+            updateIssue({
+                boardId: input.boardId,
+                issueId: input.issueId,
+                status: input.status,
+                index: input.index,
+            });
+        } else if (input.intent === 'create-issue') {
+            createIssue({
+                boardId: input.boardId,
+                title: input.title,
+                status: input.status,
+                authorId: me.id,
+            });
+        } else if (input.intent === 'link-cards') {
+            if (input.from !== input.to) {
+                linkCards({
+                    from: input.from,
+                    to: input.to,
+                    label: input.label,
+                });
+            }
+        } else if (input.intent === 'unlink-cards') {
+            unlinkRelation(input.relationId);
+        } else if (input.intent === 'set-lock') {
+            setCardLocked(
+                input.cardId,
+                input.locked,
+                input.x === undefined || input.y === undefined
+                    ? undefined
+                    : { x: input.x, y: input.y },
+            );
+        } else if (input.intent === 'update-note') {
+            updateNote({ noteId: input.noteId, text: input.text });
+        } else if (input.intent === 'update-sketch') {
+            updateSketch({ sketchId: input.sketchId, strokes: input.strokes });
+        } else if (input.intent === 'delete-card') {
+            deleteCard(input.cardId);
+        } else if (input.intent === 'rename-card') {
+            renameCard({ cardId: input.cardId, title: input.title });
+        } else if (input.intent === 'resize-card') {
+            resizeCard({
+                cardId: input.cardId,
+                size: { width: input.width, height: input.height },
+                position:
+                    input.x === undefined || input.y === undefined
+                        ? undefined
+                        : { x: input.x, y: input.y },
+            });
+        } else if (input.intent === 'duplicate') {
+            duplicateCard({
+                cardId: input.cardId,
+                authorId: me.id,
+                position:
+                    input.x === undefined || input.y === undefined
+                        ? undefined
+                        : { x: input.x, y: input.y },
+            });
+        } else if (input.intent === 'navigate-web') {
+            navigateWebPage({ webId: input.webId, url: input.url });
+        } else if (input.intent === 'move-cards') {
+            moveCards(input.positions);
+        } else if (input.intent === 'reset-positions') {
+            resetCardPositions(params.roomId);
+        } else if (input.intent === 'arrange') {
+            arrangeByLinks(params.roomId);
+        } else if (input.intent === 'restack') {
+            restackCard(input.cardId, input.to);
+        } else {
+            setCardColor(input.cardId, input.color);
+        }
+    } catch (error) {
+        if (error instanceof RoomError) {
+            return data({ error: error.message }, { status: 404 });
+        }
+        throw error;
+    }
+    return { error: null };
+}
+
+/** Collapses the nav to its icon rail (drag its edge to resize it). */
+function CollapseNavButton() {
+    const { toggle } = useNavRail();
+    return (
+        <button
+            type="button"
+            onClick={toggle}
+            aria-label="Collapse floor plan"
+            title="Collapse floor plan"
+            className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-lg outline-none focus-visible:ring-2"
+        >
+            <PanelLeftCloseIcon aria-hidden="true" className="size-4" />
+        </button>
+    );
+}
+
+/** ⌘K (Ctrl+K elsewhere) opens search from anywhere in the room. */
+function useSearchShortcut(setOpen: (open: boolean) => void) {
+    useEffect(() => {
+        function handleKeyDown(event: KeyboardEvent) {
+            if (
+                event.key.toLowerCase() === 'k' &&
+                (event.metaKey || event.ctrlKey) &&
+                !event.altKey &&
+                !event.shiftKey
+            ) {
+                event.preventDefault();
+                setOpen(true);
+            }
+        }
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [setOpen]);
+}
+
+/** How often the room reloads while its event stream is down. */
+const FALLBACK_POLL_MS = 5000;
+/** How long to wait before reopening a stream the server refused. */
+const REOPEN_MS = 5000;
+
+type StreamState = {
+    roomId: string;
+    connected: boolean;
+    /** The room's version, as the stream last said. */
+    version: string | null;
+    /** Everyone viewing the room, you included. */
+    people: Person[];
+};
+
+function subscribeToVisibility(onChange: () => void) {
+    document.addEventListener('visibilitychange', onChange);
+    return () => document.removeEventListener('visibilitychange', onChange);
+}
+
+function useTabVisible() {
+    return useSyncExternalStore(
+        subscribeToVisibility,
+        () => document.visibilityState === 'visible',
+        () => true,
+    );
+}
+
+let pointerPressed = false;
+
+function subscribeToPointer(onChange: () => void) {
+    const press = (pressed: boolean) => () => {
+        pointerPressed = pressed;
+        onChange();
+    };
+    const down = press(true);
+    const up = press(false);
+    // Capture phase: drags (cards, the nav's edge, issues) stop the
+    // events from bubbling.
+    window.addEventListener('pointerdown', down, true);
+    window.addEventListener('pointerup', up, true);
+    window.addEventListener('pointercancel', up, true);
+    return () => {
+        window.removeEventListener('pointerdown', down, true);
+        window.removeEventListener('pointerup', up, true);
+        window.removeEventListener('pointercancel', up, true);
+    };
+}
+
+/** True while a mouse button, finger, or pen is down (a drag, mostly). */
+function usePointerPressed() {
+    return useSyncExternalStore(
+        subscribeToPointer,
+        () => pointerPressed,
+        () => false,
+    );
+}
+
+/**
+ * Keeps the open room current. Its event stream
+ * (`/api/rooms/:roomId/events`) says when anyone (a person, an agent,
+ * a mock reply) changed it, as a new version, and who is here. The page
+ * reloads once per version it isn't showing, when the tab is visible,
+ * nothing of ours is in flight (a pending save's own reload may bring it),
+ * and no drag is under way (re-rendering the canvas mid-drag stutters it).
+ * While the stream is down, it polls instead. Returns who is here.
+ */
+function useRoomEvents(roomId: string, loadedVersion: string | null) {
+    const revalidator = useRevalidator();
+    const latest = useRef(revalidator);
+    useEffect(() => {
+        latest.current = revalidator;
+    });
+    const fetchers = useFetchers();
+    const pressed = usePointerPressed();
+    const busy =
+        pressed ||
+        revalidator.state !== 'idle' ||
+        fetchers.some((fetcher) => fetcher.state !== 'idle');
+    const visible = useTabVisible();
+    const [stream, setStream] = useState<StreamState>({
+        roomId,
+        connected: false,
+        version: null,
+        people: [],
+    });
+    const current =
+        stream.roomId === roomId
+            ? stream
+            : { roomId, connected: false, version: null, people: [] };
+
+    useEffect(() => {
+        let source: EventSource | undefined;
+        let reopen: ReturnType<typeof setTimeout> | undefined;
+        const update = (change: Partial<StreamState>) =>
+            setStream((previous) => ({
+                ...(previous.roomId === roomId
+                    ? previous
+                    : {
+                          roomId,
+                          connected: false,
+                          version: null,
+                          people: [],
+                      }),
+                ...change,
+            }));
+        const read = (event: Event) =>
+            JSON.parse((event as MessageEvent<string>).data) as RoomEvent;
+
+        const open = () => {
+            source = new EventSource(
+                `/api/rooms/${encodeURIComponent(roomId)}/events`,
+            );
+            source.onopen = () => update({ connected: true });
+            source.onerror = () => {
+                update({ connected: false });
+                // The browser retries a dropped stream by itself, but not
+                // one the server refused (an error status, a sign-in page).
+                if (source?.readyState === EventSource.CLOSED) {
+                    reopen = setTimeout(open, REOPEN_MS);
+                }
+            };
+            source.addEventListener('changed', (event) => {
+                const message = read(event);
+                if (message.type === 'changed') {
+                    update({ version: message.version });
+                }
+            });
+            source.addEventListener('presence', (event) => {
+                const message = read(event);
+                if (message.type === 'presence') {
+                    update({ people: message.people });
+                }
+            });
+        };
+        open();
+        return () => {
+            clearTimeout(reopen);
+            source?.close();
+        };
+    }, [roomId]);
+
+    // One reload per version we aren't showing. Never more: a change the
+    // stream didn't announce must not turn this into a reload loop.
+    const reloadedFor = useRef<string | null>(null);
+    const { version, connected } = current;
+    useEffect(() => {
+        if (
+            version === null ||
+            version === loadedVersion ||
+            version === reloadedFor.current ||
+            !visible ||
+            busy
+        ) {
+            return;
+        }
+        reloadedFor.current = version;
+        void latest.current.revalidate();
+    }, [version, loadedVersion, visible, busy]);
+
+    // Polling, only while the stream is down.
+    useEffect(() => {
+        if (connected || !visible) return;
+        const timer = setInterval(() => {
+            const { state, revalidate } = latest.current;
+            if (state === 'idle') void revalidate();
+        }, FALLBACK_POLL_MS);
+        return () => clearInterval(timer);
+    }, [connected, visible]);
+
+    return current.people;
+}
+
+/**
+ * Cards you opened, most recent first: a card goes to the top the moment
+ * you open it (including a deep link). Kept in this route's state, which
+ * lives as long as the canvas does (across card routes, not across reloads).
+ * Updated while rendering, React's pattern for state that follows a changing
+ * value, so there is no effect and no extra frame.
+ */
+function useRecentCards(cardId: string | undefined, cards: Card[]): Card[] {
+    const byId = useMemo(
+        () => new Map(cards.map((card) => [card.id, card])),
+        [cards],
+    );
+    const [recentIds, setRecentIds] = useState<string[]>(() =>
+        cardId && byId.has(cardId) ? [cardId] : [],
+    );
+    const [lastCardId, setLastCardId] = useState(cardId);
+
+    if (cardId !== lastCardId) {
+        setLastCardId(cardId);
+        if (cardId && byId.has(cardId)) {
+            setRecentIds((ids) => pushRecent(ids, cardId));
+        }
+    }
+
+    return recentIds.flatMap((id) => byId.get(id) ?? []);
+}
+
+/**
+ * The canvas stays mounted across `/` and `/cards/:cardId`, so moving
+ * between them animates the view instead of redrawing the page. The child
+ * routes only name the page (and report unknown cards).
+ */
+export default function RoomRoute({ loaderData }: Route.ComponentProps) {
+    const { room } = loaderData;
+    const { cardId, viewId } = useParams();
+    const location = useLocation();
+    const view = room.views.find((candidate) => candidate.id === viewId);
+    const recent = useRecentCards(cardId, room.cards);
+    const present = useRoomEvents(room.id, loaderData.version);
+    const [searching, setSearching] = useState(false);
+    useSearchShortcut(setSearching);
+
+    return (
+        <TrellisProvider>
+            <AddCardProvider>
+                <ResizableNav
+                    initial={loaderData.navPanel}
+                    rail={
+                        <NavRail
+                            room={room}
+                            navOrder={loaderData.navOrder}
+                            onSearch={() => setSearching(true)}
+                        />
+                    }
+                    nav={
+                        <>
+                            <div className="flex flex-col gap-2 px-4 pt-4">
+                                <div className="flex items-center gap-1">
+                                    <div className="min-w-0 flex-1">
+                                        <RoomSwitcher
+                                            roomId={room.id}
+                                            name={room.name}
+                                            space={room.space}
+                                            workspace={room.workspace}
+                                        />
+                                    </div>
+                                    <CollapseNavButton />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setSearching(true)}
+                                    className="bg-muted/60 text-muted-foreground hover:bg-muted focus-visible:ring-ring flex w-full items-center gap-2 rounded-lg border px-3 py-1.5 text-sm outline-none focus-visible:ring-2 pointer-coarse:py-2.5"
+                                >
+                                    <SearchIcon
+                                        aria-hidden="true"
+                                        className="size-4"
+                                    />
+                                    <span className="flex-1 text-left">
+                                        Directory
+                                    </span>
+                                    <kbd className="font-sans text-xs">⌘K</kbd>
+                                </button>
+                            </div>
+                            <RoomNav
+                                room={room}
+                                recent={recent}
+                                focused={Boolean(cardId)}
+                                navOrder={loaderData.navOrder}
+                                navCollapsed={loaderData.navCollapsed}
+                            />
+                        </>
+                    }
+                >
+                    <div className="bg-canvas relative size-full min-h-0">
+                        <RoomCanvas
+                            room={room}
+                            focusedId={cardId}
+                            view={view}
+                            visitKey={location.key}
+                            onSearch={() => setSearching(true)}
+                            present={present}
+                            canvasSettings={loaderData.canvasSettings}
+                        />
+                        <div className="pointer-events-none absolute inset-x-0 top-0">
+                            <Outlet />
+                        </div>
+                    </div>
+                </ResizableNav>
+                <SearchPalette
+                    open={searching}
+                    onOpenChange={setSearching}
+                    cards={room.cards}
+                    people={room.people}
+                    recent={recent}
+                    focused={Boolean(cardId)}
+                />
+            </AddCardProvider>
+        </TrellisProvider>
+    );
+}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+    const missing = isRouteErrorResponse(error) && error.status === 404;
+    return (
+        <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-16 text-center">
+            <title>{`${missing ? 'Not found' : 'Error'} | ${APP_NAME}`}</title>
+            <p className="text-sm">
+                {missing
+                    ? 'That room does not exist.'
+                    : 'Something went wrong opening that room.'}
+            </p>
+            <Button variant="outline" size="sm" render={<Link to="/" />}>
+                <ArrowLeftIcon aria-hidden="true" />
+                All spaces
+            </Button>
+        </div>
+    );
+}

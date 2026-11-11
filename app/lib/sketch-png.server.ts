@@ -1,6 +1,6 @@
 import { crc32, deflateSync } from 'node:zlib';
 import { SKETCH_PAPER, strokeOutline } from './sketch';
-import { SKETCH_SIZE, type SketchStroke } from './surface';
+import { SKETCH_SIZE, type SketchStroke } from './room';
 
 /**
  * A sketch as a PNG, so an agent can look at it: models read pictures, not

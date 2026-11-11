@@ -6,38 +6,32 @@ import {
     currentLayout,
     topLeftOf,
 } from './arrange';
-import {
-    WINDOW_GAP,
-    WINDOW_SIZES,
-    sizeOf,
-    type Relation,
-    type SurfaceItem,
-} from './surface';
+import { CARD_GAP, CARD_SIZES, sizeOf, type Relation, type Card } from './room';
 
-const chat = (id: string): SurfaceItem => ({
+const chat = (id: string): Card => ({
     kind: 'chat',
     id,
-    surfaceId: 's',
+    roomId: 's',
     title: id,
     participantIds: [],
     messages: [],
     createdById: 'me',
 });
 
-const note = (id: string): SurfaceItem => ({
+const note = (id: string): Card => ({
     kind: 'note',
     id,
-    surfaceId: 's',
+    roomId: 's',
     title: id,
     text: id,
     createdById: 'me',
     updatedAt: '2026-10-25T00:00:00Z',
 });
 
-const chart = (id: string, attachedTo: string): SurfaceItem => ({
+const chart = (id: string, attachedTo: string): Card => ({
     kind: 'chart',
     id,
-    surfaceId: 's',
+    roomId: 's',
     title: id,
     chart: 'bar',
     unit: 'x',
@@ -48,10 +42,10 @@ const chart = (id: string, attachedTo: string): SurfaceItem => ({
     createdById: 'me',
 });
 
-const doc = (id: string): SurfaceItem => ({
+const doc = (id: string): Card => ({
     kind: 'document',
     id,
-    surfaceId: 's',
+    roomId: 's',
     title: id,
     authorId: 'me',
     createdById: 'me',
@@ -68,15 +62,15 @@ const link = (from: string, to: string): Relation => ({
 
 /** Each card's box where the layout put it. */
 function boxes(
-    items: SurfaceItem[],
+    cards: Card[],
     positions: Record<string, { x: number; y: number }>,
 ) {
-    return items
-        .filter((item) => positions[item.id])
-        .map((item) => ({
-            id: item.id,
-            ...positions[item.id]!,
-            ...sizeOf(item),
+    return cards
+        .filter((card) => positions[card.id])
+        .map((card) => ({
+            id: card.id,
+            ...positions[card.id]!,
+            ...sizeOf(card),
         }));
 }
 
@@ -102,9 +96,9 @@ const origin = { x: 100, y: 50 };
 
 describe('arrangeGroups', () => {
     it('stacks each group as a column, groups left to right', () => {
-        const items = [note('a'), note('b'), chat('c')];
+        const cards = [note('a'), note('b'), chat('c')];
         const { positions, groups } = arrangeGroups(
-            items,
+            cards,
             [['a', 'b'], ['c']],
             {
                 direction: 'columns',
@@ -113,34 +107,34 @@ describe('arrangeGroups', () => {
         );
         expect(positions).toEqual({
             a: { x: 100, y: 50 },
-            b: { x: 100, y: 50 + WINDOW_SIZES.note.height + WINDOW_GAP },
-            c: { x: 100 + WINDOW_SIZES.note.width + GROUP_GAP, y: 50 },
+            b: { x: 100, y: 50 + CARD_SIZES.note.height + CARD_GAP },
+            c: { x: 100 + CARD_SIZES.note.width + GROUP_GAP, y: 50 },
         });
         expect(groups[0]).toEqual({
             x: 100,
             y: 50,
-            width: WINDOW_SIZES.note.width,
-            height: WINDOW_SIZES.note.height * 2 + WINDOW_GAP,
+            width: CARD_SIZES.note.width,
+            height: CARD_SIZES.note.height * 2 + CARD_GAP,
         });
     });
 
     it('lines each group up as a row, groups top to bottom', () => {
-        const items = [note('a'), note('b'), note('c')];
-        const { positions } = arrangeGroups(items, [['a', 'b'], ['c']], {
+        const cards = [note('a'), note('b'), note('c')];
+        const { positions } = arrangeGroups(cards, [['a', 'b'], ['c']], {
             direction: 'rows',
             origin: { x: 0, y: 0 },
             gap: 10,
         });
-        expect(positions.b).toEqual({ x: WINDOW_SIZES.note.width + 10, y: 0 });
+        expect(positions.b).toEqual({ x: CARD_SIZES.note.width + 10, y: 0 });
         expect(positions.c).toEqual({
             x: 0,
-            y: WINDOW_SIZES.note.height + GROUP_GAP,
+            y: CARD_SIZES.note.height + GROUP_GAP,
         });
     });
 
     it('takes hanging cards along under their parent', () => {
-        const items = [chat('c'), chart('k', 'c'), note('n')];
-        const { positions, skipped } = arrangeGroups(items, [['k', 'n', 'c']], {
+        const cards = [chat('c'), chart('k', 'c'), note('n')];
+        const { positions, skipped } = arrangeGroups(cards, [['k', 'n', 'c']], {
             direction: 'rows',
             origin: { x: 0, y: 0 },
         });
@@ -149,17 +143,17 @@ describe('arrangeGroups', () => {
         ]);
         expect(positions.k).toEqual({
             x: positions.c!.x,
-            y: positions.c!.y + WINDOW_SIZES.chat.height + WINDOW_GAP,
+            y: positions.c!.y + CARD_SIZES.chat.height + CARD_GAP,
         });
         // The chat's block is as wide as the chat; the note sits right of it.
         expect(positions.n).toEqual({ x: 0, y: 0 });
-        expect(positions.c!.x).toBe(WINDOW_SIZES.note.width + WINDOW_GAP);
+        expect(positions.c!.x).toBe(CARD_SIZES.note.width + CARD_GAP);
     });
 
     it('leaves locked cards, and appends the rest unless told not to', () => {
-        const items = [note('a'), note('b'), note('locked')];
+        const cards = [note('a'), note('b'), note('locked')];
         const locked = new Set(['locked']);
-        const appended = arrangeGroups(items, [['a', 'locked']], {
+        const appended = arrangeGroups(cards, [['a', 'locked']], {
             direction: 'columns',
             origin,
             locked,
@@ -170,7 +164,7 @@ describe('arrangeGroups', () => {
         ]);
         expect(appended.groups).toHaveLength(2);
 
-        const left = arrangeGroups(items, [['a']], {
+        const left = arrangeGroups(cards, [['a']], {
             direction: 'columns',
             origin,
             locked,
@@ -180,9 +174,9 @@ describe('arrangeGroups', () => {
     });
 
     it('places a card once, in the first group that names it', () => {
-        const items = [note('a'), note('b')];
+        const cards = [note('a'), note('b')];
         const { positions, groups } = arrangeGroups(
-            items,
+            cards,
             [['a'], ['a', 'b']],
             { direction: 'columns', origin, rest: 'leave' },
         );
@@ -233,24 +227,24 @@ describe('clusterLayout', () => {
         expect(positions.chat).toEqual({ x: 0, y: 0 });
         expect(positions.chart).toEqual({
             x: 0,
-            y: WINDOW_SIZES.chat.height + WINDOW_GAP,
+            y: CARD_SIZES.chat.height + CARD_GAP,
         });
         const placed = boxes(made, positions);
         for (const box of placed.filter(
             (b) => !['chat', 'chart'].includes(b.id),
         )) {
             expect(box.x).toBeGreaterThanOrEqual(
-                WINDOW_SIZES.chat.width + WINDOW_GAP,
+                CARD_SIZES.chat.width + CARD_GAP,
             );
         }
         // Tallest first: the document leads the cards beside the hub.
         expect(positions.doc).toEqual({
-            x: WINDOW_SIZES.chat.width + WINDOW_GAP,
+            x: CARD_SIZES.chat.width + CARD_GAP,
             y: 0,
         });
         const all = bounds(placed);
         const inOneLine = placed.reduce(
-            (sum, b) => sum + b.width + WINDOW_GAP,
+            (sum, b) => sum + b.width + CARD_GAP,
             0,
         );
         expect(all.width).toBeLessThan(inOneLine / 2);
@@ -261,7 +255,7 @@ describe('clusterLayout', () => {
     });
 
     it('keeps separate topics in separate blocks, and loose cards last', () => {
-        const items = [
+        const cards = [
             ...made,
             chat('other'),
             note('o1'),
@@ -274,11 +268,11 @@ describe('clusterLayout', () => {
             link('other', 'o1'),
             link('o2', 'other'),
         ];
-        const positions = clusterLayout(items, relations);
-        const placed = boxes(items, positions);
+        const positions = clusterLayout(cards, relations);
+        const placed = boxes(cards, positions);
         const of = (ids: string[]) =>
             bounds(placed.filter((box) => ids.includes(box.id)));
-        const first = of(made.map((item) => item.id));
+        const first = of(made.map((card) => card.id));
         const second = of(['other', 'o1', 'o2']);
         const loose = of(['stray', 'quiet']);
         expect(overlap(first, second)).toBe(false);
@@ -291,8 +285,8 @@ describe('clusterLayout', () => {
     });
 
     it('centers a cluster on the card with the most links', () => {
-        const items = [chat('c'), note('hub'), note('a'), note('b')];
-        const positions = clusterLayout(items, [
+        const cards = [chat('c'), note('hub'), note('a'), note('b')];
+        const positions = clusterLayout(cards, [
             link('c', 'hub'),
             link('hub', 'a'),
             link('b', 'hub'),

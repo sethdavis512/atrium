@@ -16,15 +16,15 @@ async function mcp(page: Page, name: string, args: Record<string, unknown>) {
 }
 
 test.describe('UI cards', () => {
-    test('an agent-made UI card shows live numbers and its buttons change the surface', async ({
+    test('an agent-made UI card shows live numbers and its buttons change the room', async ({
         authedPage: page,
     }) => {
-        const surface = await mcp(page, 'create_room', {
+        const room = await mcp(page, 'create_room', {
             spaceId: 'product',
             name: `UI ${crypto.randomUUID().slice(0, 6)}`,
         });
         const board = await mcp(page, 'create_board', {
-            surfaceId: surface.id,
+            roomId: room.id,
             title: 'Offsite',
             key: 'OFF',
         });
@@ -40,7 +40,7 @@ test.describe('UI cards', () => {
         });
         const path = `/boardById/${board.id}`;
         await mcp(page, 'create_ui', {
-            surfaceId: surface.id,
+            roomId: room.id,
             title: 'Offsite tracker',
             spec: {
                 root: 'root',
@@ -62,9 +62,9 @@ test.describe('UI cards', () => {
                         type: 'Stack',
                         props: { direction: null, gap: 'sm' },
                         repeat: { statePath: `${path}/issues`, key: 'id' },
-                        children: ['item'],
+                        children: ['card'],
                     },
-                    item: {
+                    card: {
                         type: 'ListItem',
                         props: {
                             title: { $item: 'title' },
@@ -93,7 +93,7 @@ test.describe('UI cards', () => {
             },
         });
 
-        await page.goto(`/surfaces/${surface.id}`);
+        await page.goto(`/rooms/${room.id}`);
         await waitForHydration(page);
         const card = page.getByRole('article', { name: 'UI: Offsite tracker' });
         await expect(card).toBeVisible();
@@ -107,7 +107,7 @@ test.describe('UI cards', () => {
         await expect(card.getByText('Book a venue')).toBeVisible();
         await expect(card.getByText('2', { exact: true })).toBeVisible();
 
-        // Done moves the real issue, and the card follows the surface.
+        // Done moves the real issue, and the card follows the room.
         await card
             .getByText('Book a venue')
             .locator('xpath=ancestor::div[contains(@class,"rounded-lg")][1]')
@@ -115,7 +115,7 @@ test.describe('UI cards', () => {
             .click();
         await expect(card.getByText('Book a venue')).toHaveCount(0);
         await expect(card.getByText('1', { exact: true })).toBeVisible();
-        const after = await mcp(page, 'get_card', { itemId: board.id });
+        const after = await mcp(page, 'get_card', { cardId: board.id });
         expect(
             after.issues.find(
                 (issue: { title: string }) => issue.title === 'Book a venue',
@@ -135,7 +135,7 @@ test.describe('UI cards', () => {
                 params: {
                     name: 'create_ui',
                     arguments: {
-                        surfaceId: 'atlas-launch',
+                        roomId: 'atlas-launch',
                         title: 'Nope',
                         spec: {
                             root: 'x',

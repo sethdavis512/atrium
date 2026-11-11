@@ -1,4 +1,4 @@
-import type { ChatItem, ChatMessage } from '~/lib/surface';
+import type { ChatCard, ChatMessage } from '~/lib/room';
 
 /**
  * A stand-in chat service: replies come from the other participants, after a
@@ -26,7 +26,7 @@ type ReplyOptions = {
 };
 
 export function pickMockReply(
-    chat: Pick<ChatItem, 'participantIds'>,
+    chat: Pick<ChatCard, 'participantIds'>,
     {
         meId,
         exclude = [],

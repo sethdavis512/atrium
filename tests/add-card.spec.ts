@@ -15,27 +15,27 @@ async function mcp(page: Page, name: string, args: Record<string, unknown>) {
     return JSON.parse(result.content[0].text);
 }
 
-/** A surface of the test's own, so adding cards never touches the seed. */
-async function openFreshSurface(page: Page) {
-    const surface = await mcp(page, 'create_room', {
+/** A room of the test's own, so adding cards never touches the seed. */
+async function openFreshRoom(page: Page) {
+    const room = await mcp(page, 'create_room', {
         spaceId: 'product',
         name: `Fresh ${crypto.randomUUID().slice(0, 6)}`,
     });
-    await page.goto(`/surfaces/${surface.id}`);
+    await page.goto(`/rooms/${room.id}`);
     await waitForHydration(page);
-    return surface as { id: string };
+    return room as { id: string };
 }
 
-async function addFromMenu(page: Page, item: string) {
+async function addFromMenu(page: Page, card: string) {
     await page.getByRole('button', { name: 'Add', exact: true }).click();
-    await page.getByRole('menuitem', { name: item }).click();
+    await page.getByRole('menuitem', { name: card }).click();
 }
 
 test.describe('Adding cards', () => {
     test('Add card puts a chat in the middle of what you are looking at', async ({
         authedPage: page,
     }) => {
-        await openFreshSurface(page);
+        await openFreshRoom(page);
         await addFromMenu(page, 'Chat');
 
         const chat = page.getByRole('region', { name: 'Chat: New chat' });
@@ -63,7 +63,7 @@ test.describe('Adding cards', () => {
     test('a new document opens in the editor, ready to type in', async ({
         authedPage: page,
     }) => {
-        await openFreshSurface(page);
+        await openFreshRoom(page);
         await addFromMenu(page, 'Document');
 
         await expect(page).toHaveURL(/\/cards\/doc-[\w-]+$/);
@@ -78,7 +78,7 @@ test.describe('Adding cards', () => {
     test('images, videos, and pages ask for an address and check it first', async ({
         authedPage: page,
     }) => {
-        await openFreshSurface(page);
+        await openFreshRoom(page);
         await addFromMenu(page, 'Image…');
 
         const dialog = page.getByRole('dialog', { name: 'Add an image' });
@@ -105,7 +105,7 @@ test.describe('Adding cards', () => {
     }) => {
         // Tall enough that the new chat's header clears the filter bar.
         await page.setViewportSize({ width: 1280, height: 1000 });
-        await openFreshSurface(page);
+        await openFreshRoom(page);
         await addFromMenu(page, 'Chat');
         const chat = page.getByRole('region', { name: 'Chat: New chat' });
         await expect(chat).toBeVisible();
@@ -133,7 +133,7 @@ test.describe('Adding cards', () => {
     });
 
     test('⌘K adds cards too', async ({ authedPage: page }) => {
-        await openFreshSurface(page);
+        await openFreshRoom(page);
         await page.keyboard.press('ControlOrMeta+k');
         const palette = page.getByRole('dialog', {
             name: 'Directory',

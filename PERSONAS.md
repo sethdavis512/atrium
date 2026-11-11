@@ -2,19 +2,19 @@
 
 Who Atrium is for, written so product, copy, and feature decisions
 can be checked against real kinds of people: "would Rosa open this before a
-customer call?", "can Nora find her way around a surface she didn't make?".
+customer call?", "can Nora find her way around a room she didn't make?".
 They are composites, not real people. Three of them are already in the seed
-data (`PEOPLE` in `app/models/surface.server.ts`), and each has a seeded
-surface to start a walkthrough from.
+data (`PEOPLE` in `app/models/room.server.ts`), and each has a seeded
+room to start a walkthrough from.
 
-| Persona                                         | Role                             | Main job for the app                                          | Home surface (seed)           | Cards they reach for                         |
+| Persona                                         | Role                             | Main job for the app                                          | Home room (seed)              | Cards they reach for                         |
 | ----------------------------------------------- | -------------------------------- | ------------------------------------------------------------- | ----------------------------- | -------------------------------------------- |
 | [Maya](#maya-the-head-of-product)               | Head of Product                  | Keep a launch's brief, plan, numbers, and talk in one picture | Atlas launch (Product)        | Documents, boards, charts, chats, views      |
 | [Dev](#dev-the-engineering-lead)                | Engineering Lead                 | Hand coding work to agents and see what came back             | Launch retro (Product)        | Agent chats, pull requests, web pages, notes |
 | [Rosa](#rosa-the-customer-success-manager)      | Customer Success                 | Know everything about one account before the next call        | Northwind (Customers)         | Documents, web pages, notes, search          |
 | [Kenji](#kenji-the-brand-designer)              | Brand designer                   | Gather references and decisions for a visual direction        | Brand refresh (Design)        | Images, GIFs, sketches, web pages, boards    |
-| [Nora](#nora-the-new-hire)                      | New hire, any team               | Understand a project from its surface, without a guided tour  | Any, made by someone else     | Saved views, search, focus, links            |
-| [The agent](#the-agent-a-user-without-a-screen) | Surface Agent, or any MCP client | Do work on a surface and leave it tidy for people             | Agent test drive (Playground) | Every kind, through MCP tools                |
+| [Nora](#nora-the-new-hire)                      | New hire, any team               | Understand a project from its room, without a guided tour     | Any, made by someone else     | Saved views, search, focus, links            |
+| [The agent](#the-agent-a-user-without-a-screen) | The Concierge, or any MCP client | Do work in a room and leave it tidy for people                | Agent test drive (Playground) | Every kind, through MCP tools                |
 
 Plus two [anti-personas](#who-this-is-not-for) to say no to.
 
@@ -49,10 +49,10 @@ engineering, design, and customer success that all touch it.
   the right cluster in a review, on any screen size.
 - **Filters** and **search** to dim everything but the agent's work, or
   everything but documents, when the canvas gets busy.
-- Asks the agent to **arrange** the surface into columns by workstream
+- Asks the agent to **arrange** the room into columns by workstream
   before a meeting.
 
-**What would make Maya stay:** the surface becoming the place reviews
+**What would make Maya stay:** the room becoming the place reviews
 happen, so it stays current because people work in it.
 
 **Objections:** "Isn't this another tool to keep in sync?" (today it is: the
@@ -93,13 +93,13 @@ human ones.
 **How Dev uses Atrium**
 
 - **Live agent chats** (with `ANTHROPIC_API_KEY` set) whose tool calls show
-  as cards and leave cards on the surface.
+  as cards and leave cards in the room.
 - **Pull requests** hung in a column under the chat that opened them, moved
   draft → open → merged from the footer.
 - **Web pages** for the docs the agent read, under the same chat.
 - **Sticky notes** for retro takeaways, next to the chats they're about.
-- Drives the surface from **Claude Code over MCP** (`.mcp.json`) while
-  coding, so the canvas fills in without switching windows.
+- Drives the room from **Claude Code over MCP** (`.mcp.json`) while
+  coding, so the canvas fills in without switching cards.
 
 **What would make Dev stay:** pull requests backed by a real repository, and
 agent chats that can be resumed with full context.
@@ -135,7 +135,7 @@ mid-rollout and asking about SSO.
 
 **How Rosa uses Atrium**
 
-- A **surface per account** in the Customers space, with an account
+- A **room per account** in the Customers space, with an account
   **document** (the SSO plan) and the customer's own site as a **web page**.
 - **Sticky notes** typed during calls, then linked to the doc.
 - **⌘K search** for a phrase from a past message or issue ("SSO", an issue
@@ -144,10 +144,10 @@ mid-rollout and asking about SSO.
   `@`.
 
 **What would make Rosa stay:** finding a customer's history in seconds, and
-links from account surfaces into the product surfaces that mention them.
+links from account rooms into the product rooms that mention them.
 
-**Objections:** "Links can't cross surfaces" (true today: links and
-references stay inside one surface, so Northwind can't point at an Atlas
+**Objections:** "Links can't cross rooms" (true today: links and
+references stay inside one room, so Northwind can't point at an Atlas
 issue). "Many sites won't load in the web card" (frame-blocking; the card
 offers open-in-new-tab).
 
@@ -155,7 +155,7 @@ offers open-in-new-tab).
 before the call." Plain words; no canvas or card jargon.
 
 **Walkthrough story:** Rosa has a Northwind call in ten minutes, opens the
-Northwind surface, searches for SSO, reads the plan, adds a note of the
+Northwind room, searches for SSO, reads the plan, adds a note of the
 customer's new question, and links it to the document.
 
 ---
@@ -185,7 +185,7 @@ components. Works with two design boards and a lot of references.
 - **Web pages** of color tools and component libraries.
 - **Issue boards** (DSN, AST) for design reviews and asset requests.
 - **Border colors** and **locked** cards to keep the moodboard where it was
-  composed while the rest of the surface rearranges.
+  composed while the rest of the room rearranges.
 
 **What would make Kenji stay:** uploading files directly (today images are
 https addresses only), and a sketch tool good enough to replace paper.
@@ -205,7 +205,7 @@ the next design review that links the sketch.
 
 ## Nora, the new hire
 
-**Context:** joined last week. Was told "it's all on the surface" and handed
+**Context:** joined last week. Was told "it's all in the room" and handed
 a link.
 
 **Goals**
@@ -228,9 +228,9 @@ a link.
 - **Links** between cards to follow how things relate, and the agent stripe
   to tell people's work from agents'.
 - **⌘K search** and **Recent** to get back to what was just read.
-- The **surface switcher** to see every space and surface in the workspace.
+- The **room switcher** to see every space and room in the workspace.
 
-**What would make Nora stay:** a surface that explains itself in the first
+**What would make Nora stay:** a room that explains itself in the first
 minute.
 
 **Objections:** "Where do I start?" (there's no overview or pinned start
@@ -248,19 +248,19 @@ and searches for the issue assigned to her.
 
 ## The agent, a user without a screen
 
-**Context:** the Surface Agent in live agent chats, or any MCP client (Claude
+**Context:** the Concierge in live agent chats, or any MCP client (Claude
 Code, another agent) connected to `/api/mcp`. Reads and writes the same
 store people do, and every change shows on open canvases within seconds.
 
 **Goals**
 
-- Know what's on a surface and how it relates before changing it.
+- Know what's in a room and how it relates before changing it.
 - Make cards people can read: documents in Markdown, links that say why.
 - Leave the canvas tidier than it found it.
 
 **Pains today (for agents in general)**
 
-- Tools that speak in internal names ("item", "window") instead of the
+- Tools that speak in internal names ("card", "window") instead of the
   words people use.
 - No sense of space: an agent can add ten cards and bury the one a person
   was reading.
@@ -270,7 +270,7 @@ store people do, and every change shows on open canvases within seconds.
 - `list_cards`, `get_card`, and `search` to read; `get_layout` to see where
   things sit.
 - `create_document` and `append_to_document` in Markdown, with
-  `[text](item:<id>)` references and `![](item:<id>)` embeds.
+  `[text](card:<id>)` references and `![](card:<id>)` embeds.
 - `arrange_cards` and `move_card` to lay out what it made; `save_view` to
   frame it for people.
 - Everything it makes is marked agent-made (the stripe, badge, and "By
@@ -306,9 +306,9 @@ integrations later), not the source of truth.
   agent, check that people can still read what it leaves behind.
 - **Copy check:** read labels and empty states as Rosa (plain words) and as
   Nora (no prior context). Say "card" everywhere people or agents read.
-- **Walkthroughs:** each persona's story starts from a seeded surface, so a
+- **Walkthroughs:** each persona's story starts from a seeded room, so a
   walkthrough can run against a fresh dev server with no setup.
 - **Roadmap signals:** real integrations behind boards and pull requests
-  (Maya, Dev), links across surfaces (Rosa), file uploads (Kenji), a
-  surface overview or start card (Nora), and multiplayer with permissions
+  (Maya, Dev), links across rooms (Rosa), file uploads (Kenji), a
+  room overview or start card (Nora), and multiplayer with permissions
   (everyone) are the gaps these personas would raise first.

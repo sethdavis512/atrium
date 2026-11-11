@@ -7,7 +7,7 @@
  * with it, the nav writes with it.
  */
 
-export const NAV_PANEL_COOKIE = 'surface-nav-panel';
+export const NAV_PANEL_COOKIE = 'room-nav-panel';
 
 /** Widths in pixels: the default, the drag limits, and the icon rail. */
 export const NAV_WIDTH = { default: 256, min: 208, max: 420, rail: 56 };

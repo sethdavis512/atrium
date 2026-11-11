@@ -1,7 +1,7 @@
 import { test, expect, waitForHydration } from './fixtures';
 
-test.describe('Spaces and surfaces', () => {
-    test('home lists spaces and their surfaces, and each surface has its own cards', async ({
+test.describe('Spaces and rooms', () => {
+    test('home lists spaces and their rooms, and each room has its own cards', async ({
         authedPage: page,
     }) => {
         await page.goto('/');
@@ -12,31 +12,31 @@ test.describe('Spaces and surfaces', () => {
         const customers = page.getByRole('region', { name: 'Customers' });
         await customers.getByRole('link', { name: /Northwind/ }).click();
 
-        await expect(page).toHaveURL(/\/surfaces\/northwind$/);
+        await expect(page).toHaveURL(/\/rooms\/northwind$/);
         await expect(page).toHaveTitle(/^Northwind \|/);
         await expect(
             page.getByRole('article', {
                 name: 'Document: Northwind account plan',
             }),
         ).toBeVisible();
-        // Atlas launch's cards are on their own surface, not this one.
+        // Atlas launch's cards are in their own room, not this one.
         await expect(
             page.getByRole('article', { name: 'Document: Atlas launch brief' }),
         ).toHaveCount(0);
 
-        // The switcher says where you are and jumps to another surface.
+        // The switcher says where you are and jumps to another room.
         const switcher = page.getByRole('button', {
             name: 'Room: Northwind, in Customers. Switch room',
         });
         await switcher.click();
         await page.getByRole('menuitem', { name: 'Atlas launch' }).click();
-        await expect(page).toHaveURL(/\/surfaces\/atlas-launch$/);
+        await expect(page).toHaveURL(/\/rooms\/atlas-launch$/);
         await expect(
             page.getByRole('article', { name: 'Document: Atlas launch brief' }),
         ).toBeVisible();
     });
 
-    test('a new surface opens with a chat with the agent, ready for cards', async ({
+    test('a new room opens with a chat with the agent, ready for cards', async ({
         authedPage: page,
     }) => {
         const name = `Planning ${Date.now()}`;
@@ -47,7 +47,7 @@ test.describe('Spaces and surfaces', () => {
         await product.getByRole('textbox', { name: 'Room name' }).fill(name);
         await product.getByRole('button', { name: 'Create' }).click();
 
-        await expect(page).toHaveURL(/\/surfaces\/surface-[\w-]+$/);
+        await expect(page).toHaveURL(/\/rooms\/room-[\w-]+$/);
         await expect(page).toHaveTitle(new RegExp(`^${name} \\|`));
         await expect(
             page.getByRole('button', {
@@ -60,10 +60,10 @@ test.describe('Spaces and surfaces', () => {
         ).toBeVisible();
     });
 
-    test('an unknown surface answers 404 with a way home', async ({
+    test('an unknown room answers 404 with a way home', async ({
         authedPage: page,
     }) => {
-        const response = await page.goto('/surfaces/not-a-surface');
+        const response = await page.goto('/rooms/not-a-room');
         expect(response?.status()).toBe(404);
         await expect(page.getByText('That room does not exist.')).toBeVisible();
         await page.getByRole('link', { name: 'All spaces' }).click();
