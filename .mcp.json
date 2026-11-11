@@ -2,7 +2,7 @@
     "mcpServers": {
         "atrium": {
             "type": "http",
-            "url": "http://localhost:5173/api/mcp"
+            "url": "http://localhost:5174/api/mcp"
         }
     }
 }
