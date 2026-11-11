@@ -75,9 +75,41 @@ export type PullRequestFile = {
     deletions: number;
 };
 
+export const REVIEW_VERDICTS = [
+    'approved',
+    'changes_requested',
+    'commented',
+] as const;
+
+export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number];
+
+/** One person's review of a pull request, oldest first on the card. */
+export type PullRequestReview = {
+    id: string;
+    authorId: string;
+    verdict: ReviewVerdict;
+    body: string;
+    at: string;
+    /** The GitHub commit it reviewed; a new push leaves it behind. */
+    headSha?: string;
+};
+
+/** The GitHub pull request a card stands for, and when it was last read. */
+export type GitHubPullRequestLink = {
+    owner: string;
+    repo: string;
+    number: number;
+    url: string;
+    /** The commit its checks and a merge are for. */
+    headSha: string;
+    syncedAt: string;
+};
+
 /**
- * A code change a chat produced (a mock: there is no repository behind it).
- * `chatId` is the chat it came from; the canvas hangs it under that chat.
+ * A code change a chat produced. `chatId` is the chat it came from; the
+ * canvas hangs it under that chat. With `github` it stands for a real pull
+ * request (title, files, checks, and state come from GitHub); without, it's
+ * a mock.
  */
 export type PullRequestCard = {
     kind: 'pull-request';
@@ -96,8 +128,44 @@ export type PullRequestCard = {
     summary: string;
     checks: { passed: number; failed: number; pending: number };
     files: PullRequestFile[];
+    /** Oldest first. Only a person's approval lets it merge. */
+    reviews?: PullRequestReview[];
+    github?: GitHubPullRequestLink;
     updatedAt: string;
 };
+
+/**
+ * Where a pull request's review stands: the latest approval or change
+ * request from a person on the commit it's at now. Comments, anything the
+ * agent says, and reviews of a commit since pushed over don't count.
+ */
+export function reviewStateOf(
+    pr: Pick<PullRequestCard, 'reviews' | 'github'>,
+): 'approved' | 'changes_requested' | 'none' {
+    const reviews = pr.reviews ?? [];
+    const head = pr.github?.headSha;
+    for (let index = reviews.length - 1; index >= 0; index--) {
+        const review = reviews[index]!;
+        if (review.authorId === AGENT_ID || review.verdict === 'commented') {
+            continue;
+        }
+        if (head && review.headSha && review.headSha !== head) continue;
+        return review.verdict;
+    }
+    return 'none';
+}
+
+/** Why a pull request can't merge yet, or null when it can. */
+export function mergeBlockerOf(
+    pr: Pick<PullRequestCard, 'status' | 'reviews' | 'checks' | 'github'>,
+): string | null {
+    if (pr.status !== 'open') return 'Only an open pull request can merge.';
+    const review = reviewStateOf(pr);
+    if (review === 'changes_requested') return 'Changes were requested.';
+    if (review !== 'approved') return 'It needs a person to approve it.';
+    if (pr.checks.failed > 0) return 'Checks are failing.';
+    return null;
+}
 
 export type ChartPoint = { label: string; value: number };
 
@@ -156,6 +224,8 @@ export type Issue = {
     description?: string;
     /** Oldest first. */
     comments?: IssueComment[];
+    /** The agent chat working on it, once it's been handed to an agent. */
+    delegatedChatId?: string;
     createdById: string;
     updatedAt: string;
 };

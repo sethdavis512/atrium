@@ -431,7 +431,7 @@ describe('/api/mcp', () => {
         expect(result.isError).toBe(true);
     });
 
-    it('opens a pull request from a chat and merges it', async () => {
+    it('opens a pull request from a chat; a person, not the agent, merges it', async () => {
         const opened = await callTool('open_pull_request', {
             chatId: 'chat-launch',
             title: 'Rate limit the public API',
@@ -458,10 +458,14 @@ describe('/api/mcp', () => {
             pullRequestId: pr.id,
             status: 'merged',
         });
-        expect(JSON.parse(merged.content[0]!.text)).toMatchObject({
-            status: 'merged',
-            checks: { passed: 8, pending: 0 },
+        expect(merged.isError).toBe(true);
+        const approved = await callTool('comment_on_pull_request', {
+            pullRequestId: pr.id,
+            text: 'Looks right to me.',
         });
+        expect(JSON.parse(approved.content[0]!.text).reviews).toMatchObject([
+            { authorId: 'agent', verdict: 'commented' },
+        ]);
     });
 
     it('only opens pull requests from chats', async () => {

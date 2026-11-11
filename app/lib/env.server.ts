@@ -84,6 +84,16 @@ const envSchema = z.object({
             message: 'MCP_API_KEY must be at least 32 characters',
         }),
     /**
+     * Optional GitHub connection for pull request cards (docs/MVP.md). A
+     * GitHub App (all three GITHUB_APP_* set) is preferred; GITHUB_TOKEN, a
+     * fine-grained personal access token, is for local demos. With neither,
+     * pull request cards stay mocks.
+     */
+    GITHUB_APP_ID: z.string().optional(),
+    GITHUB_APP_PRIVATE_KEY: z.string().optional(),
+    GITHUB_APP_INSTALLATION_ID: z.string().optional(),
+    GITHUB_TOKEN: z.string().optional(),
+    /**
      * Optional Stripe billing. When STRIPE_SECRET_KEY is unset, billing.server.ts
      * runs in stub mode (mock checkout/portal sessions, logged to the console) so
      * local dev and CI need no Stripe account. STRIPE_WEBHOOK_SECRET verifies

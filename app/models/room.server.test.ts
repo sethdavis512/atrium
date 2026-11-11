@@ -20,6 +20,7 @@ import {
     createIssue,
     updateIssue,
     setPullRequestStatus,
+    openPullRequest,
     createDocument,
     getCard,
     getRoomForUser,
@@ -57,6 +58,11 @@ import {
     resizeCard,
     getLayout,
     deleteCard,
+    reviewPullRequest,
+    mergePullRequest,
+    delegateIssue,
+    delegationBrief,
+    linkGitHubPullRequest,
 } from './room.server';
 
 const ALICE = 'user-alice';
@@ -1010,6 +1016,11 @@ describe('room store', () => {
     });
 
     it('finishes in-review issues when their pull request merges', () => {
+        reviewPullRequest({
+            pullRequestId: 'pr-api-freeze',
+            authorId: 'dev',
+            verdict: 'approved',
+        });
         setPullRequestStatus('pr-api-freeze', 'merged');
         const board = getCard('board-atlas');
         if (board.kind !== 'board') throw new Error('expected a board');
@@ -1020,5 +1031,120 @@ describe('room store', () => {
         expect(
             board.issues.find((i) => i.identifier === 'ATL-17')!.status,
         ).toBe('in_progress');
+    });
+});
+
+describe('reviewing and handing work to agents', () => {
+    it('merges only after a person approves, and says reviews in the chat', async () => {
+        await expect(mergePullRequest('pr-api-freeze')).rejects.toThrow(
+            /needs a person to approve/,
+        );
+        expect(() =>
+            reviewPullRequest({
+                pullRequestId: 'pr-api-freeze',
+                authorId: 'agent',
+                verdict: 'approved',
+            }),
+        ).toThrow(/Only a person/);
+        expect(() =>
+            reviewPullRequest({
+                pullRequestId: 'pr-api-freeze',
+                authorId: 'dev',
+                verdict: 'changes_requested',
+            }),
+        ).toThrow(/Say what to change/);
+
+        reviewPullRequest({
+            pullRequestId: 'pr-api-freeze',
+            authorId: 'dev',
+            verdict: 'changes_requested',
+            body: 'Back off between retries.',
+        });
+        const pr = getCard('pr-api-freeze');
+        invariant(pr.kind === 'pull-request');
+        const chat = getCard(pr.chatId!);
+        invariant(chat.kind === 'chat');
+        expect(chat.messages.at(-1)).toMatchObject({
+            authorId: 'dev',
+            text: `Changes requested on #${pr.number}: Back off between retries.`,
+        });
+        await expect(mergePullRequest(pr.id)).rejects.toThrow(
+            /Changes were requested/,
+        );
+
+        reviewPullRequest({
+            pullRequestId: pr.id,
+            authorId: 'dev',
+            verdict: 'approved',
+        });
+        const merged = await mergePullRequest(pr.id);
+        expect(merged.status).toBe('merged');
+        expect(merged.checks.pending).toBe(0);
+    });
+
+    it('hands an issue to an agent chat that carries it to review and done', async () => {
+        const board = getCard('board-atlas');
+        invariant(board.kind === 'board');
+        const waiting = board.issues.find(
+            (issue) => issue.status === 'todo' || issue.status === 'backlog',
+        );
+        invariant(waiting);
+
+        const { chat, issue } = delegateIssue({
+            issue: waiting.identifier,
+            byId: 'dev',
+        });
+        expect(chat).toMatchObject({
+            kind: 'chat',
+            roomId: board.roomId,
+            title: `${waiting.identifier}: ${waiting.title}`,
+            participantIds: ['dev', 'agent'],
+        });
+        expect(issue).toMatchObject({
+            status: 'in_progress',
+            delegatedChatId: chat.id,
+        });
+        expect(issue.links).toContain(chat.id);
+        expect(delegationBrief(issue)).toContain(waiting.identifier);
+        // Handing it over again finds the same chat.
+        expect(delegateIssue({ issue: waiting.id, byId: 'dev' }).chat.id).toBe(
+            chat.id,
+        );
+
+        const pr = openPullRequest({
+            chatId: chat.id,
+            title: 'Fix it',
+            branch: 'atlas/fix',
+        });
+        const after = () => {
+            const current = getCard('board-atlas');
+            invariant(current.kind === 'board');
+            return current.issues.find((entry) => entry.id === waiting.id)!;
+        };
+        expect(after()).toMatchObject({ status: 'in_review' });
+        expect(after().links).toContain(pr.id);
+
+        reviewPullRequest({
+            pullRequestId: pr.id,
+            authorId: 'dev',
+            verdict: 'approved',
+        });
+        await mergePullRequest(pr.id);
+        expect(after().status).toBe('done');
+    });
+
+    it('explains how to connect GitHub before linking a real pull request', async () => {
+        await expect(
+            linkGitHubPullRequest({
+                chatId: 'chat-launch',
+                url: 'https://github.com/acme/atlas/pull/12',
+            }),
+        ).rejects.toThrow(/GitHub is not connected/);
+        await expect(
+            linkGitHubPullRequest({
+                chatId: 'chat-launch',
+                url: 'https://example.com/acme/atlas/pull/12',
+            }),
+        ).rejects.toThrow(/isn't a GitHub pull request address/);
     });
 });

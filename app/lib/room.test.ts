@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+    mergeBlockerOf,
+    reviewStateOf,
     CARD_GAP,
     CARD_SIZES,
     clampSize,
@@ -433,5 +435,84 @@ describe('resizing', () => {
         expect(
             placeNewCard([{ x: 0, kind: 'chat', width: 600 }], 'chat').x,
         ).toBe(600 + CARD_GAP);
+    });
+});
+
+describe('reviewStateOf and mergeBlockerOf', () => {
+    const base = {
+        status: 'open' as const,
+        checks: { passed: 2, failed: 0, pending: 0 },
+    };
+    const review = (
+        authorId: string,
+        verdict: 'approved' | 'changes_requested' | 'commented',
+        headSha?: string,
+    ) => ({
+        id: authorId + verdict,
+        authorId,
+        verdict,
+        body: '',
+        at: '',
+        headSha,
+    });
+
+    it('counts the latest approval or change request from a person', () => {
+        expect(reviewStateOf({ reviews: [] })).toBe('none');
+        expect(
+            reviewStateOf({
+                reviews: [
+                    review('dev', 'changes_requested'),
+                    review('maya', 'approved'),
+                    review('agent', 'approved'),
+                    review('rosa', 'commented'),
+                ],
+            }),
+        ).toBe('approved');
+    });
+
+    it('forgets reviews of a commit since pushed over', () => {
+        const github = {
+            owner: 'acme',
+            repo: 'atlas',
+            number: 1,
+            url: '',
+            headSha: 'new',
+            syncedAt: '',
+        };
+        expect(
+            reviewStateOf({
+                reviews: [review('dev', 'approved', 'old')],
+                github,
+            }),
+        ).toBe('none');
+        expect(
+            reviewStateOf({
+                reviews: [review('dev', 'approved', 'new')],
+                github,
+            }),
+        ).toBe('approved');
+    });
+
+    it('says why a pull request cannot merge', () => {
+        expect(mergeBlockerOf({ ...base, reviews: [] })).toMatch(/approve/);
+        expect(
+            mergeBlockerOf({
+                ...base,
+                reviews: [review('dev', 'changes_requested')],
+            }),
+        ).toMatch(/Changes were requested/);
+        expect(
+            mergeBlockerOf({
+                ...base,
+                checks: { passed: 1, failed: 1, pending: 0 },
+                reviews: [review('dev', 'approved')],
+            }),
+        ).toMatch(/failing/);
+        expect(
+            mergeBlockerOf({ ...base, status: 'draft', reviews: [] }),
+        ).toMatch(/open/);
+        expect(
+            mergeBlockerOf({ ...base, reviews: [review('dev', 'approved')] }),
+        ).toBeNull();
     });
 });

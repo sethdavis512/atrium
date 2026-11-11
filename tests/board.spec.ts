@@ -363,4 +363,43 @@ test.describe('Issue boards', () => {
             .poll(() => order(card, 'Backlog', board.tag))
             .toEqual(['Fresh idea']);
     });
+
+    test('an issue handed to the Concierge opens its chat and tracks the pull request', async ({
+        authedPage: page,
+    }) => {
+        const board = await boardWith(page, ['Delegate me']);
+        await page.goto(`${ROOM}/cards/${board.id}`);
+        await waitForHydration(page);
+        const card = boardCard(page, board.title);
+        const handle = issueHandle(card, board.tag, 'Delegate me');
+        const identifier = (await handle.getAttribute('aria-label'))!.split(
+            ' ',
+        )[1]!;
+
+        await card
+            .getByRole('button', {
+                name: `Open ${identifier}: ${board.tag} Delegate me`,
+            })
+            .click();
+        await card.getByRole('button', { name: 'Hand to Concierge' }).click();
+
+        // Its new agent chat opens focused, titled after the issue.
+        const chatTitle = `${identifier}: ${board.tag} Delegate me`;
+        const chat = page.getByRole('region', { name: `Chat: ${chatTitle}` });
+        await expect(chat).toBeVisible();
+        await expect(page).toHaveURL(/\/cards\/chat-/);
+        const chatId = new URL(page.url()).pathname.split('/').at(-1)!;
+
+        // A pull request from that chat moves the issue to In Review.
+        await mcp(page, 'open_pull_request', {
+            chatId,
+            title: `${board.tag} The fix`,
+            branch: 'e2e/fix',
+        });
+        await page.goto(`${ROOM}/cards/${board.id}`);
+        await waitForHydration(page);
+        await expect
+            .poll(() => order(card, 'In Review', board.tag))
+            .toEqual(['Delegate me']);
+    });
 });

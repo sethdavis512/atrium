@@ -82,11 +82,17 @@ import {
     setCardColor,
     updateDocument,
     setPullRequestStatus,
+    reviewPullRequest,
+    mergePullRequest,
+    syncPullRequest,
+    delegateIssue,
+    delegationBrief,
     updateIssue,
 } from '~/models/room.server';
 import {
     ISSUE_PRIORITIES,
     ISSUE_STATUSES,
+    REVIEW_VERDICTS,
     TITLE_MAX,
     CARD_COLOR_NAMES,
     cardPath,
@@ -170,6 +176,24 @@ const intentSchema = z.discriminatedUnion('intent', [
         intent: z.literal('set-pr-status'),
         pullRequestId: z.string().min(1),
         status: z.enum(['draft', 'open', 'merged', 'closed']),
+    }),
+    z.object({
+        intent: z.literal('review-pr'),
+        pullRequestId: z.string().min(1),
+        verdict: z.enum(REVIEW_VERDICTS),
+        body: z.string().max(4000).optional(),
+    }),
+    z.object({
+        intent: z.literal('merge-pr'),
+        pullRequestId: z.string().min(1),
+    }),
+    z.object({
+        intent: z.literal('sync-pr'),
+        pullRequestId: z.string().min(1),
+    }),
+    z.object({
+        intent: z.literal('delegate-issue'),
+        issueId: z.string().min(1),
     }),
     z.object({
         intent: z.literal('move-issue'),
@@ -421,6 +445,64 @@ async function applyIntent({ request, context, params }: Route.ActionArgs) {
             }
             throw error;
         }
+    }
+    // Pull request reviews and merges answer 400 with what to do instead.
+    if (
+        input.intent === 'review-pr' ||
+        input.intent === 'merge-pr' ||
+        input.intent === 'sync-pr'
+    ) {
+        try {
+            if (input.intent === 'review-pr') {
+                reviewPullRequest({
+                    pullRequestId: input.pullRequestId,
+                    authorId: me.id,
+                    verdict: input.verdict,
+                    body: input.body,
+                });
+            } else if (input.intent === 'merge-pr') {
+                await mergePullRequest(input.pullRequestId);
+            } else {
+                await syncPullRequest(input.pullRequestId);
+            }
+            return { error: null };
+        } catch (error) {
+            if (error instanceof RoomError) {
+                return data({ error: error.message }, { status: 400 });
+            }
+            throw error;
+        }
+    }
+    // Handing an issue to the Concierge opens its new chat. With the live
+    // agent on, the brief waits in the composer (sending it is what starts
+    // Claude); with it off, the brief is posted so an outside agent reading
+    // the chat over MCP has it.
+    if (input.intent === 'delegate-issue') {
+        let target: string;
+        try {
+            const { chat, issue } = delegateIssue({
+                issue: input.issueId,
+                byId: me.id,
+            });
+            const brief = delegationBrief(issue);
+            target = cardPath(params.roomId, chat.id);
+            if (env.ANTHROPIC_API_KEY) {
+                target += `?${new URLSearchParams({ draft: brief })}`;
+            } else if (chat.messages.length === 0) {
+                postMessage({
+                    chatId: chat.id,
+                    authorId: me.id,
+                    text: brief,
+                    mockReply: false,
+                });
+            }
+        } catch (error) {
+            if (error instanceof RoomError) {
+                return data({ error: error.message }, { status: 400 });
+            }
+            throw error;
+        }
+        throw redirect(target);
     }
     // Documents answer with their new version (the next save's base), or
     // 409 when someone else saved first.

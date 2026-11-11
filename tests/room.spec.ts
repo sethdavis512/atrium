@@ -585,10 +585,27 @@ test.describe('Room', () => {
         await card.getByRole('link', { name: /From chat/ }).click();
         await expect(page).toHaveURL(/\/cards\/chat-customers$/);
 
-        // Merge it from its card.
+        // Review it from its card: Merge waits for a person's approval, and
+        // requested changes go back to the chat.
         await page.goto(`${ROOM}/cards/${created.id}`);
         await waitForHydration(page);
         await expect(card.getByText('Open', { exact: true })).toBeVisible();
+        await expect(
+            card.getByRole('button', { name: 'Merge' }),
+        ).toBeDisabled();
+        await expect(
+            card.getByText('It needs a person to approve it.'),
+        ).toBeVisible();
+        await card.getByRole('button', { name: 'Request changes' }).click();
+        await card
+            .getByRole('textbox', { name: 'What to change' })
+            .pressSequentially('Add a test.');
+        await card.getByRole('button', { name: 'Send to the chat' }).click();
+        await expect(
+            card.getByText('Changes requested', { exact: true }),
+        ).toBeVisible();
+        await card.getByRole('button', { name: 'Approve' }).click();
+        await expect(card.getByText('Approved', { exact: true })).toBeVisible();
         await card.getByRole('button', { name: 'Merge' }).click();
         await expect(card.getByText('Merged', { exact: true })).toBeVisible();
         await expect(card.getByRole('button', { name: 'Merge' })).toHaveCount(

@@ -70,6 +70,11 @@ import {
     saveView,
     setCardColor,
     setPullRequestStatus,
+    delegateIssue,
+    delegationBrief,
+    linkGitHubPullRequest,
+    reviewPullRequest,
+    syncPullRequest,
 } from '~/models/room.server';
 import { uiGuide, uiSpecInputSchema } from '~/lib/ui-card';
 import { pictureOf } from '~/models/card-picture.server';
@@ -150,6 +155,24 @@ function run(
 ): ToolContent {
     try {
         return format(body());
+    } catch (error) {
+        if (error instanceof RoomError) {
+            return {
+                content: [{ type: 'text' as const, text: error.message }],
+                isError: true,
+            };
+        }
+        throw error;
+    }
+}
+
+/** `run` for tool bodies that wait on something (GitHub). */
+async function runAsync(
+    body: () => Promise<unknown>,
+    format: (value: unknown) => ToolContent = result,
+): Promise<ToolContent> {
+    try {
+        return format(await body());
     } catch (error) {
         if (error instanceof RoomError) {
             return {
@@ -659,15 +682,98 @@ export function createRoomMcpServer(): McpServer {
         {
             title: 'Move a pull request along',
             description:
-                'Sets a pull request to draft, open (ready for review), merged, or closed. Merging passes any pending checks.',
+                "Sets a mock pull request to draft, open (ready for review), or closed. Agents can't merge: a person approves and merges from the card. A GitHub-backed pull request changes state on GitHub; refresh_pull_request then reads it.",
             inputSchema: {
                 pullRequestId: z.string(),
-                status: z.enum(['draft', 'open', 'merged', 'closed']),
+                status: z.enum(['draft', 'open', 'closed']),
             },
             annotations: { idempotentHint: true },
         },
         ({ pullRequestId, status }) =>
             run(() => setPullRequestStatus(pullRequestId, status)),
+    );
+
+    server.registerTool(
+        'start_issue',
+        {
+            title: 'Pick up an issue',
+            description:
+                "Hands an issue to an agent (you): makes an agent chat in the issue's room, titled after it and linked from its board, and moves the issue to In Progress. Returns the chat (post your plan and progress there), the issue, and a brief. Open the pull request with link_pull_request on that chat, which moves the issue to In Review. Starting an issue already handed over returns its chat.",
+            inputSchema: {
+                issue: z
+                    .string()
+                    .describe('The issue id or identifier, like "ATL-14".'),
+                byId: z
+                    .string()
+                    .optional()
+                    .describe(
+                        `The person handing it over (see list_people), who joins the chat. Defaults to "${AGENT_ID}".`,
+                    ),
+            },
+        },
+        ({ issue, byId = AGENT_ID }) =>
+            run(() => {
+                const started = delegateIssue({ issue, byId });
+                return {
+                    chat: { ...started.chat, url: link(started.chat.id) },
+                    issue: started.issue,
+                    brief: delegationBrief(started.issue),
+                };
+            }),
+    );
+
+    server.registerTool(
+        'link_pull_request',
+        {
+            title: 'Put a GitHub pull request in the room',
+            description:
+                'Adds a real GitHub pull request (its https://github.com/<owner>/<repo>/pull/<n> address) as a card under the chat that made it: title, branch, description, files, and checks come from GitHub. The chat gets a message, and issues handed to that chat link it and move to In Review. A person reviews and merges it from the card. Linking one that is already in the room refreshes it. Needs GitHub connected (docs/MVP.md).',
+            inputSchema: {
+                chatId: z.string().describe('The chat the change came from.'),
+                url: z.string().describe('The pull request on GitHub.'),
+                authorId: authorSchema,
+            },
+        },
+        (input) =>
+            runAsync(async () => {
+                const pr = await linkGitHubPullRequest(input);
+                return { ...pr, link: link(pr.id) };
+            }),
+    );
+
+    server.registerTool(
+        'refresh_pull_request',
+        {
+            title: 'Refresh a GitHub pull request',
+            description:
+                'Re-reads a GitHub-backed pull request card after you push: new commits, checks, and whether it was merged or closed. A new commit means it needs approving again.',
+            inputSchema: { pullRequestId: z.string() },
+            annotations: { idempotentHint: true },
+        },
+        ({ pullRequestId }) => runAsync(() => syncPullRequest(pullRequestId)),
+    );
+
+    server.registerTool(
+        'comment_on_pull_request',
+        {
+            title: 'Comment on a pull request',
+            description:
+                "Adds a review comment to a pull request card, also posted in its chat. Agents can comment but never approve or request changes; that's for people.",
+            inputSchema: {
+                pullRequestId: z.string(),
+                text: z.string().min(1).max(4000),
+                authorId: authorSchema,
+            },
+        },
+        ({ pullRequestId, text, authorId = AGENT_ID }) =>
+            run(() =>
+                reviewPullRequest({
+                    pullRequestId,
+                    authorId,
+                    verdict: 'commented',
+                    body: text,
+                }),
+            ),
     );
 
     server.registerTool(

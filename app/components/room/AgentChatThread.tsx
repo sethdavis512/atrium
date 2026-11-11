@@ -1,5 +1,10 @@
 import { use, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useRevalidator } from 'react-router';
+import {
+    useNavigate,
+    useParams,
+    useRevalidator,
+    useSearchParams,
+} from 'react-router';
 import { useChat } from '@ai-sdk/react';
 import {
     DefaultChatTransport,
@@ -123,7 +128,13 @@ export function AgentChatThread({
 }) {
     const revalidator = useRevalidator();
     const { meId } = useRoomPeople();
-    const [draft, setDraft] = useState('');
+    // An issue handed to the Concierge opens its chat with the brief waiting
+    // here (`?draft=`), so sending it is what starts the agent.
+    const { cardId } = useParams();
+    const [searchParams] = useSearchParams();
+    const [draft, setDraft] = useState(() =>
+        cardId === chat.id ? (searchParams.get('draft') ?? '') : '',
+    );
     const listRef = useRef<HTMLOListElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 

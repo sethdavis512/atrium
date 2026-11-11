@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Link, useSubmit } from 'react-router';
-import { ChevronLeftIcon, FileTextIcon, UserIcon } from 'lucide-react';
+import { BotIcon, ChevronLeftIcon, FileTextIcon, UserIcon } from 'lucide-react';
 import { cx } from 'cva.config';
 import { Button } from '~/components/ui/button';
 import {
@@ -314,6 +314,43 @@ export function IssueDetail({ board, issue, onClose }: Props) {
                             )}
                             {assignee?.name ?? 'Unassigned'}
                         </PickerMenu>
+                    </Property>
+                    <Property label="Agent">
+                        {issue.delegatedChatId &&
+                        titleOf(issue.delegatedChatId) ? (
+                            <Link
+                                to={links.card(issue.delegatedChatId)}
+                                className="hover:bg-accent focus-visible:ring-ring flex items-center gap-2 rounded-md px-2 py-1 text-xs outline-none focus-visible:ring-2"
+                            >
+                                <BotIcon
+                                    aria-hidden="true"
+                                    className="text-agent size-3.5 shrink-0"
+                                />
+                                Open the agent's chat
+                            </Link>
+                        ) : (
+                            <Button
+                                type="button"
+                                size="xs"
+                                variant="outline"
+                                className="nodrag w-full justify-start"
+                                onClick={() =>
+                                    void submit(
+                                        {
+                                            intent: 'delegate-issue',
+                                            issueId: issue.id,
+                                        },
+                                        {
+                                            method: 'post',
+                                            action: links.action,
+                                        },
+                                    )
+                                }
+                            >
+                                <BotIcon aria-hidden="true" />
+                                Hand to Concierge
+                            </Button>
+                        )}
                     </Property>
                     {issue.links.length > 0 && (
                         <Property label="Linked">

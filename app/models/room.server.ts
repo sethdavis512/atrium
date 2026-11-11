@@ -15,6 +15,13 @@ import {
 } from './seed-rooms.server';
 import { uiSpecProblems } from '~/lib/ui-card';
 import { markChanged } from './room-events.server';
+import { parsePullRequestUrl } from '~/lib/github';
+import {
+    GitHubError,
+    mergeOnGitHub,
+    readPullRequest,
+    type PullRequestSnapshot,
+} from '~/lib/github.server';
 import {
     markdownToPortableText,
     referencedCardIds,
@@ -57,6 +64,8 @@ import {
     type PullRequestFile,
     type PullRequestCard,
     type PullRequestStatus,
+    type ReviewVerdict,
+    mergeBlockerOf,
     type Relation,
     type SavedView,
     type Room,
@@ -1522,19 +1531,289 @@ export function openPullRequest({
         authorId,
         text: `Opened #${pr.number}: ${title} (${branch} → ${base}).`,
     });
+    linkDelegatedIssues(pr);
     return structuredClone(pr);
 }
 
-/** Moves a pull request along: draft, open, merged, or closed. */
-export function setPullRequestStatus(
-    pullRequestId: string,
-    status: PullRequestStatus,
-): PullRequestCard {
+/**
+ * Issues handed to the chat a pull request came from now track it: linked
+ * to the PR and moved to In Review.
+ */
+function linkDelegatedIssues(pr: PullRequestCard) {
+    if (!pr.chatId) return;
+    for (const board of boards()) {
+        for (const issue of board.issues) {
+            if (issue.delegatedChatId !== pr.chatId) continue;
+            if (!issue.links.includes(pr.id)) issue.links.push(pr.id);
+            if (issue.status !== 'done') issue.status = 'in_review';
+            issue.updatedAt = new Date().toISOString();
+        }
+    }
+}
+
+function requirePullRequest(pullRequestId: string): PullRequestCard {
     const pr = requireCard(pullRequestId);
     if (pr.kind !== 'pull-request') {
         throw new RoomError(
             `"${pullRequestId}" is a ${pr.kind}, not a pull request.`,
         );
+    }
+    return pr;
+}
+
+/** Copies what GitHub says about a pull request onto its card. */
+function applySnapshot(pr: PullRequestCard, snapshot: PullRequestSnapshot) {
+    pr.title = snapshot.title;
+    pr.summary = snapshot.summary;
+    pr.repo = `${snapshot.owner}/${snapshot.repo}`;
+    pr.number = snapshot.number;
+    pr.branch = snapshot.branch;
+    pr.base = snapshot.base;
+    pr.status = snapshot.status;
+    pr.files = snapshot.files;
+    pr.checks = snapshot.checks;
+    const syncedAt = new Date().toISOString();
+    pr.github = {
+        owner: snapshot.owner,
+        repo: snapshot.repo,
+        number: snapshot.number,
+        url: snapshot.url,
+        headSha: snapshot.headSha,
+        syncedAt,
+    };
+    pr.updatedAt = syncedAt;
+}
+
+/** GitHub's errors, as the room's, so callers show their message. */
+async function fromGitHub<T>(call: () => Promise<T>): Promise<T> {
+    try {
+        return await call();
+    } catch (error) {
+        if (error instanceof GitHubError) throw new RoomError(error.message);
+        throw error;
+    }
+}
+
+/**
+ * Puts a real GitHub pull request on the room, under the chat that made it:
+ * read from GitHub (title, branch, description, files, checks, state),
+ * linked "opened" from the chat, announced there, and tracked by any issue
+ * handed to that chat. Linking the same pull request again refreshes the
+ * card it already has.
+ */
+export async function linkGitHubPullRequest({
+    chatId,
+    url,
+    authorId = AGENT_ID,
+}: {
+    chatId: string;
+    url: string;
+    authorId?: string;
+}): Promise<PullRequestCard> {
+    const chat = requireCard(chatId);
+    if (chat.kind !== 'chat') {
+        throw new RoomError(`"${chatId}" is a ${chat.kind}, not a chat.`);
+    }
+    requireKnownPeople([authorId]);
+    const ref = parsePullRequestUrl(url);
+    if (!ref) {
+        throw new RoomError(
+            `"${url}" isn't a GitHub pull request address (https://github.com/<owner>/<repo>/pull/<number>).`,
+        );
+    }
+    const existing = store().cards.find(
+        (card): card is PullRequestCard =>
+            card.kind === 'pull-request' &&
+            card.github?.owner === ref.owner &&
+            card.github.repo === ref.repo &&
+            card.github.number === ref.number,
+    );
+    if (existing) return syncPullRequest(existing.id);
+
+    const snapshot = await fromGitHub(() => readPullRequest(ref));
+    const pr: PullRequestCard = {
+        kind: 'pull-request',
+        id: newId('pr'),
+        roomId: chat.roomId,
+        title: snapshot.title,
+        number: snapshot.number,
+        repo: `${snapshot.owner}/${snapshot.repo}`,
+        branch: snapshot.branch,
+        base: snapshot.base,
+        status: snapshot.status,
+        authorId,
+        createdById: authorId,
+        chatId,
+        summary: snapshot.summary,
+        checks: snapshot.checks,
+        files: snapshot.files,
+        updatedAt: new Date().toISOString(),
+    };
+    applySnapshot(pr, snapshot);
+    storeCard(pr);
+    linkCards({ from: chatId, to: pr.id, label: 'opened' });
+    postMessage({
+        chatId,
+        authorId,
+        text: `Opened #${pr.number}: ${pr.title} (${pr.branch} → ${pr.base}).`,
+        mockReply: false,
+    });
+    linkDelegatedIssues(pr);
+    return structuredClone(pr);
+}
+
+/** Re-reads a GitHub-backed pull request: new commits, checks, its state. */
+export async function syncPullRequest(
+    pullRequestId: string,
+): Promise<PullRequestCard> {
+    const pr = requirePullRequest(pullRequestId);
+    if (!pr.github) {
+        throw new RoomError(
+            `#${pr.number} isn't backed by a GitHub pull request.`,
+        );
+    }
+    const github = pr.github;
+    const snapshot = await fromGitHub(() => readPullRequest(github));
+    const wasMerged = pr.status === 'merged';
+    applySnapshot(pr, snapshot);
+    if (!wasMerged && pr.status === 'merged') finishIssuesOf(pr);
+    return structuredClone(pr);
+}
+
+/** What a review says in the pull request's chat. */
+function reviewMessage(
+    pr: PullRequestCard,
+    verdict: ReviewVerdict,
+    body: string,
+) {
+    if (verdict === 'approved') {
+        return body
+            ? `Approved #${pr.number}: ${body}`
+            : `Approved #${pr.number}.`;
+    }
+    if (verdict === 'changes_requested') {
+        return `Changes requested on #${pr.number}: ${body}`;
+    }
+    return `On #${pr.number}: ${body}`;
+}
+
+/**
+ * Reviews a pull request: approve, request changes, or comment. Only a
+ * person can approve or request changes, never the agent. The review is
+ * also said in the chat the pull request came from, so the agent working
+ * there sees what to change.
+ */
+export function reviewPullRequest({
+    pullRequestId,
+    authorId,
+    verdict,
+    body = '',
+}: {
+    pullRequestId: string;
+    authorId: string;
+    verdict: ReviewVerdict;
+    body?: string;
+}): PullRequestCard {
+    const pr = requirePullRequest(pullRequestId);
+    requireKnownPeople([authorId]);
+    const text = body.trim();
+    if (verdict !== 'commented' && authorId === AGENT_ID) {
+        throw new RoomError(
+            'Only a person can approve or request changes; the agent can comment.',
+        );
+    }
+    if (verdict !== 'approved' && !text) {
+        throw new RoomError(
+            verdict === 'changes_requested'
+                ? 'Say what to change.'
+                : 'A comment needs some text.',
+        );
+    }
+    if (pr.status === 'merged' || pr.status === 'closed') {
+        throw new RoomError(`#${pr.number} is already ${pr.status}.`);
+    }
+    const at = new Date().toISOString();
+    pr.reviews = [
+        ...(pr.reviews ?? []),
+        {
+            id: newId('review'),
+            authorId,
+            verdict,
+            body: text,
+            at,
+            ...(pr.github && { headSha: pr.github.headSha }),
+        },
+    ];
+    pr.updatedAt = at;
+    const chat = pr.chatId
+        ? store().cards.find((card) => card.id === pr.chatId)
+        : undefined;
+    if (chat?.kind === 'chat') {
+        postMessage({
+            chatId: chat.id,
+            authorId,
+            text: reviewMessage(pr, verdict, text),
+            mockReply: false,
+        });
+    }
+    return structuredClone(pr);
+}
+
+/** Merging finishes the issues the pull request was in review for. */
+function finishIssuesOf(pr: PullRequestCard) {
+    for (const board of boards()) {
+        for (const tracked of board.issues) {
+            if (
+                tracked.links.includes(pr.id) &&
+                tracked.status === 'in_review'
+            ) {
+                tracked.status = 'done';
+                tracked.updatedAt = pr.updatedAt;
+            }
+        }
+    }
+}
+
+/**
+ * Merges a pull request once a person has approved it and no checks fail
+ * (`mergeBlockerOf`). A GitHub-backed one merges on GitHub first, at the
+ * commit that was reviewed; then its issues move to Done.
+ */
+export async function mergePullRequest(
+    pullRequestId: string,
+): Promise<PullRequestCard> {
+    const pr = requirePullRequest(pullRequestId);
+    const blocker = mergeBlockerOf(pr);
+    if (blocker)
+        throw new RoomError(`#${pr.number} can't merge yet. ${blocker}`);
+    if (pr.github) {
+        const github = pr.github;
+        await fromGitHub(() => mergeOnGitHub(github));
+        return syncPullRequest(pr.id);
+    }
+    return setPullRequestStatus(pr.id, 'merged');
+}
+
+/**
+ * Moves a pull request along: draft, open, merged, or closed. Merging goes
+ * through the same gate as `mergePullRequest`; a GitHub-backed pull request
+ * changes state on GitHub, so it only merges through `mergePullRequest`.
+ */
+export function setPullRequestStatus(
+    pullRequestId: string,
+    status: PullRequestStatus,
+): PullRequestCard {
+    const pr = requirePullRequest(pullRequestId);
+    if (pr.github && status !== pr.status) {
+        throw new RoomError(
+            `#${pr.number} is a GitHub pull request: ${status === 'merged' ? 'merge it from its card' : `change it on GitHub (${pr.github.url})`}, then refresh.`,
+        );
+    }
+    if (status === 'merged') {
+        const blocker = mergeBlockerOf(pr);
+        if (blocker) {
+            throw new RoomError(`#${pr.number} can't merge yet. ${blocker}`);
+        }
     }
     pr.status = status;
     if (status === 'merged') {
@@ -1545,20 +1824,7 @@ export function setPullRequestStatus(
         };
     }
     pr.updatedAt = new Date().toISOString();
-    // Merging finishes the issues it was in review for.
-    if (status === 'merged') {
-        for (const board of boards()) {
-            for (const tracked of board.issues) {
-                if (
-                    tracked.links.includes(pr.id) &&
-                    tracked.status === 'in_review'
-                ) {
-                    tracked.status = 'done';
-                    tracked.updatedAt = pr.updatedAt;
-                }
-            }
-        }
-    }
+    if (status === 'merged') finishIssuesOf(pr);
     return structuredClone(pr);
 }
 
@@ -2411,6 +2677,69 @@ export function updateIssue({
     return structuredClone(
         board.issues.find((candidate) => candidate.id === found.id)!,
     );
+}
+
+/** An issue on any board, by its id or identifier ("ATL-14"). */
+function findIssue(ref: string): { board: BoardCard; issue: Issue } {
+    for (const board of boards()) {
+        const issue = board.issues.find(
+            (candidate) => candidate.id === ref || candidate.identifier === ref,
+        );
+        if (issue) return { board, issue };
+    }
+    throw new RoomError(`No issue "${ref}". See list_cards for boards.`);
+}
+
+/**
+ * Hands an issue to an agent: an agent chat in the board's room, titled
+ * after the issue and linked "delegated" from the board, which the issue
+ * remembers (`delegatedChatId`) and links. The issue moves to In Progress.
+ * A pull request opened from that chat then moves it to In Review. Handing
+ * it over again returns the chat it already has.
+ */
+export function delegateIssue({
+    issue: ref,
+    byId,
+}: {
+    issue: string;
+    byId: string;
+}): { chat: ChatCard; issue: Issue } {
+    requireKnownPeople([byId]);
+    const { board, issue } = findIssue(ref);
+    const existing = issue.delegatedChatId
+        ? store().cards.find((card) => card.id === issue.delegatedChatId)
+        : undefined;
+    if (existing?.kind === 'chat') {
+        return {
+            chat: structuredClone(existing),
+            issue: structuredClone(issue),
+        };
+    }
+    const chat = createChat({
+        roomId: board.roomId,
+        title: `${issue.identifier}: ${issue.title}`.slice(0, TITLE_MAX),
+        authorId: byId,
+        participantIds: [byId, AGENT_ID],
+    });
+    linkCards({ from: board.id, to: chat.id, label: 'delegated' });
+    issue.delegatedChatId = chat.id;
+    if (!issue.links.includes(chat.id)) issue.links.push(chat.id);
+    if (issue.status === 'backlog' || issue.status === 'todo') {
+        issue.status = 'in_progress';
+    }
+    issue.updatedAt = new Date().toISOString();
+    return { chat, issue: structuredClone(issue) };
+}
+
+/** What an agent handed an issue should be told, as a first message. */
+export function delegationBrief(issue: Issue): string {
+    return [
+        `Please pick up ${issue.identifier}: ${issue.title}.`,
+        issue.description?.trim(),
+        'Post your plan here first, and link the pull request here when it is ready for review.',
+    ]
+        .filter(Boolean)
+        .join('\n\n');
 }
 
 /** Adds a comment to an issue's activity. */
