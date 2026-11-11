@@ -138,7 +138,7 @@ export function ItemChip({ itemId, children, editing = false }: ChipProps) {
     if (!item) {
         return (
             <span
-                title="No longer on the surface"
+                title="No longer in the room"
                 className="text-muted-foreground line-through"
             >
                 {children}
@@ -193,7 +193,7 @@ export function ItemCard({ itemId, editing = false }: CardProps) {
     if (!item) {
         return (
             <p className="text-muted-foreground italic">
-                An item that is no longer on the surface.
+                An item that is no longer in the room.
             </p>
         );
     }
@@ -278,6 +278,6 @@ function summary(item: SurfaceItem): string {
         case 'sketch':
             return `${item.strokes.length} strokes`;
         case 'ui':
-            return 'Live view of this surface';
+            return 'Live view of this room';
     }
 }

@@ -85,7 +85,7 @@ export function DeleteCardProvider({ children }: PropsWithChildren) {
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             {item
-                                ? `This ${KIND_NAMES[item.kind].toLowerCase()} and its links go for everyone on this surface. This can't be undone.`
+                                ? `This ${KIND_NAMES[item.kind].toLowerCase()} and its links go for everyone in this room. This can't be undone.`
                                 : null}
                         </AlertDialogDescription>
                         {hanging.length > 0 && (

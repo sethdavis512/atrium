@@ -244,7 +244,7 @@ export function FilterBar({ filter, onChange, shown, total, query }: Props) {
                         }
                     >
                         <BotIcon aria-hidden="true" className="size-3.5" />
-                        By agent
+                        By Concierge
                     </Chip>
                     <span
                         aria-hidden="true"

@@ -103,7 +103,7 @@ const authorSchema = z
 
 const surfaceIdSchema = z
     .string()
-    .describe('The surface it goes on (see list_spaces).');
+    .describe('The room it goes in (see list_spaces).');
 
 /** A card's URL in the app (on its own surface). */
 function link(itemId: string) {
@@ -161,57 +161,18 @@ function run(
     }
 }
 
-/**
- * Tools renamed to say "card" (the app's word for what sits on a surface),
- * by new name: the old names still work, so agents set up before keep going.
- */
-const OLD_TOOL_NAMES: Record<string, string> = {
-    list_cards: 'list_items',
-    get_card: 'get_item',
-    link_cards: 'link_items',
-    duplicate_card: 'duplicate_item',
-    set_card_color: 'set_window_color',
-    restack_card: 'restack_window',
-};
-
 export function createSurfaceMcpServer(): McpServer {
     const server = new McpServer({
         name: APP_NAME,
         version: '0.1.0',
     });
 
-    /** `server.registerTool`, plus the tool's old name when it has one. */
-    const register = ((
-        name: string,
-        config: { title?: string; description?: string },
-        callback: unknown,
-    ) => {
-        const tool = server.registerTool(
-            name,
-            config as never,
-            callback as never,
-        );
-        const oldName = OLD_TOOL_NAMES[name];
-        if (oldName) {
-            server.registerTool(
-                oldName,
-                {
-                    ...config,
-                    title: `${config.title} (old name)`,
-                    description: `The old name for ${name}, kept so existing agents keep working; use ${name}. ${config.description ?? ''}`,
-                } as never,
-                callback as never,
-            );
-        }
-        return tool;
-    }) as typeof server.registerTool;
-
     server.registerTool(
         'list_spaces',
         {
-            title: 'List spaces and surfaces',
+            title: 'List spaces and rooms',
             description:
-                "The workspace: every space (a group, like a team or project) with its surfaces (canvases of cards), in order, with how many cards each surface holds and of which kinds, and each surface's URL. Cards always live on one surface; most tools that add cards take its surfaceId.",
+                "The workspace: every space (a group, like a team or project) with its rooms (canvases of cards), in order, with how many cards each room holds and of which kinds, and each room's URL. Cards always live in one room; most tools that add cards take its surfaceId.",
             inputSchema: {},
             annotations: { readOnlyHint: true },
         },
@@ -231,7 +192,7 @@ export function createSurfaceMcpServer(): McpServer {
         'create_space',
         {
             title: 'Start a space',
-            description: 'Starts an empty space to hold surfaces.',
+            description: 'Starts an empty space to hold rooms.',
             inputSchema: {
                 name: z.string().trim().min(1).max(60),
                 description: z.string().max(200).optional(),
@@ -241,11 +202,11 @@ export function createSurfaceMcpServer(): McpServer {
     );
 
     server.registerTool(
-        'create_surface',
+        'create_room',
         {
-            title: 'Start a surface',
+            title: 'Start a room',
             description:
-                'Starts an empty surface (a canvas for cards) in a space. Returns it with its URL.',
+                'Starts an empty room (a canvas for cards) in a space. Returns it with its URL.',
             inputSchema: {
                 spaceId: z.string().describe('See list_spaces.'),
                 name: z.string().trim().min(1).max(60),
@@ -262,17 +223,17 @@ export function createSurfaceMcpServer(): McpServer {
             }),
     );
 
-    register(
+    server.registerTool(
         'list_cards',
         {
             title: 'List cards',
             description:
-                "Cards (chats, documents, pull requests, charts, boards, videos, web pages, images, sticky notes, sketches) with their id, kind, title, and surface; every card in the workspace, or only one surface's with surfaceId. To find cards by what they say, use search.",
+                "Cards (chats, documents, pull requests, charts, boards, videos, web pages, images, sticky notes, sketches) with their id, kind, title, and room; every card in the workspace, or only one room's with surfaceId. To find cards by what they say, use search.",
             inputSchema: {
                 surfaceId: z
                     .string()
                     .optional()
-                    .describe('Only this surface (see list_spaces).'),
+                    .describe('Only this room (see list_spaces).'),
             },
             annotations: { readOnlyHint: true },
         },
@@ -282,7 +243,7 @@ export function createSurfaceMcpServer(): McpServer {
     server.registerTool(
         'search',
         {
-            title: 'Search the surface',
+            title: 'Search the room',
             description:
                 "Finds cards by what's in them: titles, chat messages, document text, issues (by title or identifier like ATL-3), pull request summaries and branches, chart captions, web addresses, and image descriptions. Matches word prefixes and small typos; every word must match. Returns the best hit per card, best first, with a snippet; a hit inside a chat or board names the message (subId, subLabel = who sent it) or issue (subId, subLabel = its identifier).",
             inputSchema: {
@@ -292,7 +253,7 @@ export function createSurfaceMcpServer(): McpServer {
                     .string()
                     .optional()
                     .describe(
-                        'Only this surface; the whole workspace without it.',
+                        'Only this room; the whole workspace without it.',
                     ),
             },
             annotations: { readOnlyHint: true },
@@ -316,7 +277,7 @@ export function createSurfaceMcpServer(): McpServer {
             }),
     );
 
-    register(
+    server.registerTool(
         'get_card',
         {
             title: 'Get a card',
@@ -366,7 +327,7 @@ export function createSurfaceMcpServer(): McpServer {
         {
             title: 'Start a chat',
             description:
-                'Starts a new chat on a surface, optionally with an opening message. Returns the chat and its URL.',
+                'Starts a new chat in a room, optionally with an opening message. Returns the chat and its URL.',
             inputSchema: {
                 surfaceId: surfaceIdSchema,
                 title: z.string().min(1).max(120),
@@ -407,7 +368,7 @@ export function createSurfaceMcpServer(): McpServer {
         {
             title: 'Start a document',
             description:
-                'Creates a new document on a surface. Returns the document and its URL. Item links in it must point at cards on the same surface.',
+                'Creates a new document in a room. Returns the document and its URL. Item links in it must point at cards in the same room.',
             inputSchema: {
                 surfaceId: surfaceIdSchema,
                 title: z.string().min(1).max(160),
@@ -450,12 +411,12 @@ export function createSurfaceMcpServer(): McpServer {
             ),
     );
 
-    register(
+    server.registerTool(
         'link_cards',
         {
             title: 'Relate two cards',
             description:
-                'Draws a labeled relation between two cards on the surface, from one to the other (for example "discusses" or "references"). See the links already there with list_links; remove one with unlink_cards.',
+                'Draws a labeled relation between two cards in the room, from one to the other (for example "discusses" or "references"). See the links already there with list_links; remove one with unlink_cards.',
             inputSchema: {
                 from: z.string(),
                 to: z.string(),
@@ -470,9 +431,9 @@ export function createSurfaceMcpServer(): McpServer {
         {
             title: 'List saved views',
             description:
-                "Saved spots on a surface (a center point and zoom) that people jump between, with their URLs; every surface's, or one with surfaceId.",
+                "Saved spots in a room (a center point and zoom) that people jump between, with their URLs; every room's, or one with surfaceId.",
             inputSchema: {
-                surfaceId: z.string().optional().describe('Only this surface.'),
+                surfaceId: z.string().optional().describe('Only this room.'),
             },
             annotations: { readOnlyHint: true },
         },
@@ -529,7 +490,7 @@ export function createSurfaceMcpServer(): McpServer {
                     );
                     if (!framed) {
                         throw new SurfaceError(
-                            'None of those itemIds are on that surface.',
+                            'None of those itemIds are in that room.',
                         );
                     }
                     spot = { ...framed, itemIds };
@@ -560,12 +521,12 @@ export function createSurfaceMcpServer(): McpServer {
             }),
     );
 
-    register(
+    server.registerTool(
         'set_card_color',
         {
             title: 'Color a card',
             description:
-                "Sets a card's border color on the surface, or clears it with null.",
+                "Sets a card's border color in the room, or clears it with null.",
             inputSchema: {
                 itemId: z.string(),
                 color: z
@@ -582,12 +543,12 @@ export function createSurfaceMcpServer(): McpServer {
             }),
     );
 
-    register(
+    server.registerTool(
         'restack_card',
         {
             title: 'Bring a card forward or back',
             description:
-                'Brings a card to the front of the surface, or sends it to the back. Returns the order, bottom to top.',
+                'Brings a card to the front of the room, or sends it to the back. Returns the order, bottom to top.',
             inputSchema: {
                 itemId: z.string(),
                 to: z.enum(['front', 'back']),
@@ -602,7 +563,7 @@ export function createSurfaceMcpServer(): McpServer {
         {
             title: 'Read the layout',
             description:
-                "Where every card sits on the surface: x, y (top-left, in canvas pixels), width, height, what it hangs under, and whether it's locked. Read it before arranging or moving cards.",
+                "Where every card sits in the room: x, y (top-left, in canvas pixels), width, height, what it hangs under, and whether it's locked. Read it before arranging or moving cards.",
             inputSchema: { surfaceId: surfaceIdSchema },
             annotations: { readOnlyHint: true },
         },
@@ -614,7 +575,7 @@ export function createSurfaceMcpServer(): McpServer {
         {
             title: 'Arrange cards',
             description:
-                'Lays cards out in groups so the surface reads at a glance: each group a column of cards (groups side by side, left to right) or a row (groups top to bottom). Group what belongs together (a chat with what it produced, a plan with its board, references with each other) and order groups the way the work flows. To title a group, add a sticky note and put it first. Cards hanging under another (charts, pull requests, pages, videos, images) travel with it; locked cards stay put. Cards no group names go in a last group unless rest is "leave". Everyone\'s canvas slides to the new layout.',
+                'Lays cards out in groups so the room reads at a glance: each group a column of cards (groups side by side, left to right) or a row (groups top to bottom). Group what belongs together (a chat with what it produced, a plan with its board, references with each other) and order groups the way the work flows. To title a group, add a sticky note and put it first. Cards hanging under another (charts, pull requests, pages, videos, images) travel with it; locked cards stay put. Cards no group names go in a last group unless rest is "leave". Everyone\'s canvas slides to the new layout.',
             inputSchema: {
                 surfaceId: surfaceIdSchema,
                 groups: z
@@ -761,7 +722,7 @@ export function createSurfaceMcpServer(): McpServer {
                     .string()
                     .optional()
                     .describe(
-                        "The surface it goes on (see list_spaces); not needed with attachedTo, which puts it on its parent's surface.",
+                        "The room it goes in (see list_spaces); not needed with attachedTo, which puts it in its parent's room.",
                     ),
                 attachedTo: z
                     .string()
@@ -777,7 +738,7 @@ export function createSurfaceMcpServer(): McpServer {
             }),
     );
 
-    register(
+    server.registerTool(
         'duplicate_card',
         {
             title: 'Duplicate a card',
@@ -868,7 +829,7 @@ export function createSurfaceMcpServer(): McpServer {
         {
             title: 'List links',
             description:
-                'Every link (line on the canvas) between cards on a surface: its id, the cards it runs from and to (with their titles), and its label. Remove links with unlink_cards.',
+                'Every link (line on the canvas) between cards in a room: its id, the cards it runs from and to (with their titles), and its label. Remove links with unlink_cards.',
             inputSchema: { surfaceId: surfaceIdSchema },
             annotations: { readOnlyHint: true },
         },
@@ -891,7 +852,7 @@ export function createSurfaceMcpServer(): McpServer {
         {
             title: 'Lock a card in place',
             description:
-                "Locks a card where it is on its surface (people can't drag it, and Arrange leaves it), or unlocks it.",
+                "Locks a card where it is in its room (people can't drag it, and Arrange leaves it), or unlocks it.",
             inputSchema: { itemId: z.string(), locked: z.boolean() },
         },
         ({ itemId, locked }) =>
@@ -906,7 +867,7 @@ export function createSurfaceMcpServer(): McpServer {
         {
             title: 'Stick a note',
             description:
-                'Sticks a short note on a surface (a colored square, like a sticky note): an idea, a reminder, a retro point. Its first line names it.',
+                'Sticks a short note in a room (a colored square, like a sticky note): an idea, a reminder, a retro point. Its first line names it.',
             inputSchema: {
                 surfaceId: surfaceIdSchema,
                 text: z.string().min(1).max(4000),
@@ -952,7 +913,7 @@ export function createSurfaceMcpServer(): McpServer {
         'create_ui',
         {
             title: 'Add a UI card',
-            description: `Puts a UI card on a surface: a small live interface (a dashboard, a triage list, a review queue) composed from a fixed set of components and bound to the surface's own data, so it stays current. get_card returns a UI card's spec.\n\n${uiGuide()}`,
+            description: `Puts a UI card in a room: a small live interface (a dashboard, a triage list, a review queue) composed from a fixed set of components and bound to the room's own data, so it stays current. get_card returns a UI card's spec.\n\n${uiGuide()}`,
             inputSchema: {
                 surfaceId: surfaceIdSchema,
                 title: z.string().min(1).max(120),
@@ -1018,7 +979,7 @@ export function createSurfaceMcpServer(): McpServer {
                     .string()
                     .optional()
                     .describe(
-                        "The surface it goes on (see list_spaces); not needed with attachedTo, which puts it on its parent's surface.",
+                        "The room it goes in (see list_spaces); not needed with attachedTo, which puts it in its parent's room.",
                     ),
                 attachedTo: z
                     .string()
@@ -1039,7 +1000,7 @@ export function createSurfaceMcpServer(): McpServer {
         {
             title: 'Add a web page',
             description:
-                'Opens an https web page in a browser-like card on the surface. Some sites refuse to be embedded and show blank; people can still open them in a new tab. With attachedTo, it hangs under that chat or document, linked as "references"; otherwise it joins the main row.',
+                'Opens an https web page in a browser-like card in the room. Some sites refuse to be embedded and show blank; people can still open them in a new tab. With attachedTo, it hangs under that chat or document, linked as "references"; otherwise it joins the main row.',
             inputSchema: {
                 url: z
                     .string()
@@ -1053,7 +1014,7 @@ export function createSurfaceMcpServer(): McpServer {
                     .string()
                     .optional()
                     .describe(
-                        "The surface it goes on (see list_spaces); not needed with attachedTo, which puts it on its parent's surface.",
+                        "The room it goes in (see list_spaces); not needed with attachedTo, which puts it in its parent's room.",
                     ),
                 attachedTo: z
                     .string()

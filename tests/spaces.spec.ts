@@ -26,7 +26,7 @@ test.describe('Spaces and surfaces', () => {
 
         // The switcher says where you are and jumps to another surface.
         const switcher = page.getByRole('button', {
-            name: 'Surface: Northwind, in Customers. Switch surface',
+            name: 'Room: Northwind, in Customers. Switch room',
         });
         await switcher.click();
         await page.getByRole('menuitem', { name: 'Atlas launch' }).click();
@@ -43,20 +43,20 @@ test.describe('Spaces and surfaces', () => {
         await page.goto('/');
         await waitForHydration(page);
         const product = page.getByRole('region', { name: 'Product' });
-        await product.getByRole('button', { name: 'New surface' }).click();
-        await product.getByRole('textbox', { name: 'Surface name' }).fill(name);
+        await product.getByRole('button', { name: 'New room' }).click();
+        await product.getByRole('textbox', { name: 'Room name' }).fill(name);
         await product.getByRole('button', { name: 'Create' }).click();
 
         await expect(page).toHaveURL(/\/surfaces\/surface-[\w-]+$/);
         await expect(page).toHaveTitle(new RegExp(`^${name} \\|`));
         await expect(
             page.getByRole('button', {
-                name: `Surface: ${name}, in Product. Switch surface`,
+                name: `Room: ${name}, in Product. Switch room`,
             }),
         ).toBeVisible();
         await expect(page.locator('[data-node-id]')).toHaveCount(1);
         await expect(
-            page.getByRole('region', { name: 'Chat: Ask the agent' }),
+            page.getByRole('region', { name: 'Chat: Ask the Concierge' }),
         ).toBeVisible();
     });
 
@@ -65,9 +65,7 @@ test.describe('Spaces and surfaces', () => {
     }) => {
         const response = await page.goto('/surfaces/not-a-surface');
         expect(response?.status()).toBe(404);
-        await expect(
-            page.getByText('That surface does not exist.'),
-        ).toBeVisible();
+        await expect(page.getByText('That room does not exist.')).toBeVisible();
         await page.getByRole('link', { name: 'All spaces' }).click();
         await expect(page).toHaveURL(/\/$/);
     });

@@ -35,7 +35,7 @@ type Part = UIMessage['parts'][number];
 /** What each tool says while it runs, and once it's done. */
 const TOOL_LOOKS: Record<string, { doing: string; done: string }> = {
     list_spaces: { doing: 'Looking over the workspace', done: 'Looked over' },
-    list_cards: { doing: 'Looking over the surface', done: 'Looked over' },
+    list_cards: { doing: 'Looking over the room', done: 'Looked over' },
     read_card: { doing: 'Reading', done: 'Read' },
     look_at_card: { doing: 'Looking at', done: 'Looked at' },
     search: { doing: 'Searching', done: 'Searched' },
@@ -65,7 +65,7 @@ const TOOL_LOOKS: Record<string, { doing: string; done: string }> = {
     // Mastra's own tool for the workspace's working memory.
     updateWorkingMemory: {
         doing: 'Remembering',
-        done: 'Saved to workspace memory',
+        done: "Saved to the Concierge's notes",
     },
 };
 
@@ -323,7 +323,7 @@ export function AgentChatThread({
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
                     aria-label={`Message ${chat.title}`}
-                    placeholder="Ask the agent to make something"
+                    placeholder="Ask the Concierge to make something"
                     className="nodrag bg-muted placeholder:text-muted-foreground focus-visible:ring-ring min-w-0 flex-1 rounded-full px-4 py-2 text-sm outline-none focus-visible:ring-2"
                 />
                 {busy ? (
@@ -604,7 +604,7 @@ function Thinking() {
             aria-live="polite"
             className="text-muted-foreground flex items-center gap-1 px-1 text-xs"
         >
-            <span className="sr-only">The agent is thinking</span>
+            <span className="sr-only">The Concierge is thinking</span>
             {[0, 1, 2].map((dot) => (
                 <span
                     key={dot}

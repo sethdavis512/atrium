@@ -36,7 +36,7 @@ export const workspaceMemorySchema = z.object({
     ),
     customers: notes('Customer name → status, contacts, needs, risks.'),
     projects: notes(
-        'Project or launch name → goal, owner, dates, current state, and which space or surface holds it.',
+        'Project or launch name → goal, owner, dates, current state, and which space or room holds it.',
     ),
     decisions: z
         .array(z.string())

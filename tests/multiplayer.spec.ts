@@ -65,7 +65,7 @@ test.describe('Multiplayer', () => {
 
         const setup = await createAuthedContext(browser, baseURL, 'setup');
         contexts.push(setup);
-        const surface = await mcp(await setup.newPage(), 'create_surface', {
+        const surface = await mcp(await setup.newPage(), 'create_room', {
             spaceId: 'product',
             name: `Together ${run}`,
         });
@@ -118,7 +118,7 @@ test.describe('Multiplayer', () => {
     test('an agent’s change shows up without a reload', async ({
         authedPage: page,
     }) => {
-        const surface = await mcp(page, 'create_surface', {
+        const surface = await mcp(page, 'create_room', {
             spaceId: 'product',
             name: `Agent ${crypto.randomUUID().slice(0, 6)}`,
         });

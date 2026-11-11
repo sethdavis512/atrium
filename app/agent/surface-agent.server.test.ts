@@ -230,13 +230,13 @@ describe('surfaceTools', () => {
                 },
                 options,
             ),
-        ).toThrow(/another surface/);
+        ).toThrow(/another room/);
         expect(() =>
             tools().rename_card.execute!(
                 { cardId: 'doc-brief', title: 'Mine now' },
                 options,
             ),
-        ).toThrow(/another surface/);
+        ).toThrow(/another room/);
         expect(allItems()).toHaveLength(before);
         expect(getItem('doc-brief').title).not.toBe('Mine now');
     });
@@ -363,7 +363,7 @@ describe('layout tools', () => {
                 { groups: [['doc-brief']], direction: 'rows' },
                 options,
             ),
-        ).toThrow(/Not on this surface/);
+        ).toThrow(/Not in this room/);
     });
 });
 
@@ -373,19 +373,19 @@ describe('readableToolError', () => {
             name: 'Error',
             cause: {
                 message:
-                    '"pr-api-freeze" is on another surface; documents link to cards on their own surface.',
+                    '"pr-api-freeze" is in another room; documents link to cards in their own room.',
             },
             id: 'TOOL_EXECUTION_FAILED',
             domain: 'TOOL',
             category: 'USER',
             details: {
                 errorMessage:
-                    'Error: "pr-api-freeze" is on another surface; documents link to cards on their own surface.',
+                    'Error: "pr-api-freeze" is in another room; documents link to cards in their own room.',
                 model: 'claude-sonnet-5-5',
             },
         });
         expect(readableToolError(mastraError)).toBe(
-            '"pr-api-freeze" is on another surface; documents link to cards on their own surface.',
+            '"pr-api-freeze" is in another room; documents link to cards in their own room.',
         );
     });
 

@@ -131,7 +131,7 @@ export function shouldRevalidate({
 export async function loader({ request, context, params }: Route.LoaderArgs) {
     const user = requireUserFromContext(context);
     const surface = await getSurfaceForUser(user, params.surfaceId);
-    if (!surface) throw data('Surface not found', { status: 404 });
+    if (!surface) throw data('Room not found', { status: 404 });
     return {
         surface,
         version: surfaceVersion(params.surfaceId),
@@ -605,8 +605,8 @@ function CollapseNavButton() {
         <button
             type="button"
             onClick={toggle}
-            aria-label="Collapse navigation"
-            title="Collapse navigation"
+            aria-label="Collapse floor plan"
+            title="Collapse floor plan"
             className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-lg outline-none focus-visible:ring-2"
         >
             <PanelLeftCloseIcon aria-hidden="true" className="size-4" />
@@ -886,7 +886,7 @@ export default function SurfaceRoute({ loaderData }: Route.ComponentProps) {
                                         className="size-4"
                                     />
                                     <span className="flex-1 text-left">
-                                        Search
+                                        Directory
                                     </span>
                                     <kbd className="font-sans text-xs">⌘K</kbd>
                                 </button>
@@ -936,8 +936,8 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
             <title>{`${missing ? 'Not found' : 'Error'} | ${APP_NAME}`}</title>
             <p className="text-sm">
                 {missing
-                    ? 'That surface does not exist.'
-                    : 'Something went wrong opening that surface.'}
+                    ? 'That room does not exist.'
+                    : 'Something went wrong opening that room.'}
             </p>
             <Button variant="outline" size="sm" render={<Link to="/" />}>
                 <ArrowLeftIcon aria-hidden="true" />

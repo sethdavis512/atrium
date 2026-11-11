@@ -175,13 +175,13 @@ export const uiCatalog = defineCatalog(schema, {
             }),
             slots: [],
             description:
-                'A chip that opens another card on this surface (its title unless label is set)',
+                'A chip that opens another card in this room (its title unless label is set)',
         },
     },
     actions: {
         openCard: {
             params: z.object({ cardId: z.string() }),
-            description: 'Open (focus) a card on this surface',
+            description: 'Open (focus) a card in this room',
         },
         moveIssue: {
             params: z.object({
@@ -214,7 +214,7 @@ export const uiCatalog = defineCatalog(schema, {
         },
         addNote: {
             params: z.object({ text: z.string() }),
-            description: 'Pin a sticky note on the surface',
+            description: 'Pin a sticky note in the room',
         },
     },
 });

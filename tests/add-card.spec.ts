@@ -17,7 +17,7 @@ async function mcp(page: Page, name: string, args: Record<string, unknown>) {
 
 /** A surface of the test's own, so adding cards never touches the seed. */
 async function openFreshSurface(page: Page) {
-    const surface = await mcp(page, 'create_surface', {
+    const surface = await mcp(page, 'create_room', {
         spaceId: 'product',
         name: `Fresh ${crypto.randomUUID().slice(0, 6)}`,
     });
@@ -55,7 +55,7 @@ test.describe('Adding cards', () => {
             .toBeLessThan(3);
         await expect(
             page
-                .getByRole('navigation', { name: 'Surface' })
+                .getByRole('navigation', { name: 'Floor plan' })
                 .getByRole('link', { name: 'New chat' }),
         ).toBeVisible();
     });
@@ -136,10 +136,10 @@ test.describe('Adding cards', () => {
         await openFreshSurface(page);
         await page.keyboard.press('ControlOrMeta+k');
         const palette = page.getByRole('dialog', {
-            name: 'Search the surface',
+            name: 'Directory',
         });
         await palette
-            .getByRole('combobox', { name: 'Search' })
+            .getByRole('combobox', { name: 'Search the directory' })
             .pressSequentially('add board', { delay: 20 });
         await palette.getByRole('option', { name: 'Add board' }).click();
         await expect(palette).toHaveCount(0);

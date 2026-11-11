@@ -341,7 +341,7 @@ test.describe('Issue boards', () => {
         await page.goto(`${SURFACE}/cards/${board.id}`);
         await waitForHydration(page);
         const window = boardWindow(page, board.title);
-        await expect(window.getByTitle('Made by an agent')).toBeVisible();
+        await expect(window.getByTitle('Made by the Concierge')).toBeVisible();
 
         const menuIssue = issueHandle(window, board.tag, 'Menu me');
         const identifier = (await menuIssue.getAttribute('aria-label'))!.split(

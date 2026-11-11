@@ -21,18 +21,18 @@ type BadgeProps = {
     className?: string;
 };
 
-/** "Agent", with a bot icon, for window headers. */
+/** "Concierge", with a bot icon, for window headers. */
 export function AgentBadge({ className }: BadgeProps) {
     return (
         <span
-            title="Made by an agent"
+            title="Made by the Concierge"
             className={cx(
                 'bg-agent/12 text-agent inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
                 className,
             )}
         >
             <BotIcon aria-hidden="true" className="size-3" />
-            Agent
+            Concierge
         </span>
     );
 }
@@ -42,7 +42,7 @@ export function AgentIcon({ className }: BadgeProps) {
     return (
         <BotIcon
             role="img"
-            aria-label="Made by an agent"
+            aria-label="Made by the Concierge"
             className={cx('text-agent size-3.5 shrink-0', className)}
         />
     );

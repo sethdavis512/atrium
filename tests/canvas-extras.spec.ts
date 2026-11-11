@@ -17,7 +17,7 @@ async function mcp(page: Page, name: string, args: Record<string, unknown>) {
 
 /** A surface of the test's own, so nothing here touches the seed. */
 async function openFreshSurface(page: Page) {
-    const surface = await mcp(page, 'create_surface', {
+    const surface = await mcp(page, 'create_room', {
         spaceId: 'design',
         name: `Canvas ${crypto.randomUUID().slice(0, 6)}`,
     });

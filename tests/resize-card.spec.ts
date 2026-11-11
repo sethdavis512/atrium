@@ -36,7 +36,7 @@ async function dragBy(page: Page, handle: Locator, dx: number, dy: number) {
 
 /** A surface of the test's own: one chat with a pull request under it. */
 async function openChatSurface(page: Page) {
-    const surface = await mcp(page, 'create_surface', {
+    const surface = await mcp(page, 'create_room', {
         spaceId: 'product',
         name: `Resize ${crypto.randomUUID().slice(0, 6)}`,
     });

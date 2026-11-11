@@ -71,28 +71,6 @@ describe('/api/mcp', () => {
         );
     });
 
-    it("still answers to the tools' old names, pointing agents at the new ones", async () => {
-        const { result } = await (await rpc('tools/list')).json();
-        const tools: { name: string; description: string }[] = result.tools;
-        for (const [oldName, newName] of [
-            ['list_items', 'list_cards'],
-            ['get_item', 'get_card'],
-            ['link_items', 'link_cards'],
-            ['duplicate_item', 'duplicate_card'],
-            ['set_window_color', 'set_card_color'],
-            ['restack_window', 'restack_card'],
-        ]) {
-            expect(
-                tools.find((tool) => tool.name === oldName)?.description,
-            ).toMatch(new RegExp(`old name for ${newName}`));
-        }
-        const old = JSON.parse(
-            (await callTool('get_item', { itemId: 'doc-brief' })).content[0]!
-                .text,
-        );
-        expect(old.title).toBe('Atlas launch brief');
-    });
-
     it('resizes chats, clamped, and refuses other cards', async () => {
         const resized = await callTool('resize_card', {
             itemId: 'chat-launch',
@@ -270,7 +248,7 @@ describe('/api/mcp', () => {
         );
         const surface = JSON.parse(
             (
-                await callTool('create_surface', {
+                await callTool('create_room', {
                     spaceId: space.id,
                     name: 'On-call',
                 })
@@ -287,7 +265,7 @@ describe('/api/mcp', () => {
                 .content[0]!.text,
         );
         expect(onCall.map((card: { title: string }) => card.title)).toEqual([
-            'Ask the agent',
+            'Ask the Concierge',
             'Pager',
         ]);
 

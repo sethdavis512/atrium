@@ -19,7 +19,7 @@ test.describe('UI cards', () => {
     test('an agent-made UI card shows live numbers and its buttons change the surface', async ({
         authedPage: page,
     }) => {
-        const surface = await mcp(page, 'create_surface', {
+        const surface = await mcp(page, 'create_room', {
             spaceId: 'product',
             name: `UI ${crypto.randomUUID().slice(0, 6)}`,
         });

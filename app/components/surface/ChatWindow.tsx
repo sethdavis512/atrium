@@ -64,7 +64,7 @@ export function ChatWindow({ data, selected }: NodeProps<ChatNode>) {
     const subtitle = liveAgent
         ? 'Claude, live'
         : agentChat
-          ? 'Live agent off'
+          ? 'Concierge off'
           : isGroup
             ? `${chat.participantIds.length} people`
             : (others[0]?.role ?? '');

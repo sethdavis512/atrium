@@ -27,7 +27,7 @@ export async function loader({ request, context, params }: Route.LoaderArgs) {
     const user = requireUserFromContext(context);
     const { surfaceId } = params;
     if (!surfaceVersion(surfaceId)) {
-        throw data('Surface not found', { status: 404 });
+        throw data('Room not found', { status: 404 });
     }
     const person = rememberPerson(user);
     onDrainStart(closeAllSurfaceStreams);

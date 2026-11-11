@@ -17,9 +17,9 @@ test.describe('Left nav panel', () => {
         await waitForHydration(page);
         expect(await navWidth(page)).toBe(256);
 
-        await page.getByRole('button', { name: 'Collapse navigation' }).click();
+        await page.getByRole('button', { name: 'Collapse floor plan' }).click();
         await expect.poll(() => navWidth(page)).toBe(56);
-        const rail = page.getByRole('navigation', { name: 'Surface' });
+        const rail = page.getByRole('navigation', { name: 'Floor plan' });
         await rail
             .getByRole('link', { name: 'Document: Atlas launch brief' })
             .click();
@@ -29,10 +29,10 @@ test.describe('Left nav panel', () => {
         await page.goto(SURFACE);
         await waitForHydration(page);
         expect(await navWidth(page)).toBe(56);
-        await page.getByRole('button', { name: 'Expand navigation' }).click();
+        await page.getByRole('button', { name: 'Expand floor plan' }).click();
         await expect.poll(() => navWidth(page)).toBe(256);
         await expect(
-            page.getByRole('button', { name: /^Surface: Atlas launch/ }),
+            page.getByRole('button', { name: /^Room: Atlas launch/ }),
         ).toBeVisible();
     });
 
@@ -42,7 +42,7 @@ test.describe('Left nav panel', () => {
         await page.goto(SURFACE);
         await waitForHydration(page);
         const handle = page.getByRole('separator', {
-            name: 'Resize the navigation',
+            name: 'Resize the floor plan',
         });
         const box = (await handle.boundingBox())!;
         const y = box.y + box.height / 2;
@@ -65,7 +65,7 @@ test.describe('Left nav panel', () => {
         await page.mouse.up();
         await expect.poll(() => navWidth(page)).toBe(56);
         await expect(
-            page.getByRole('button', { name: 'Expand navigation' }),
+            page.getByRole('button', { name: 'Expand floor plan' }),
         ).toBeVisible();
     });
 });

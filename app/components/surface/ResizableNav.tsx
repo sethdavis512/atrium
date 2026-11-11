@@ -93,7 +93,7 @@ export function ResizableNav({ initial, nav, rail, children }: Props) {
                     {collapsed ? rail : nav}
                 </Panel>
                 <Separator
-                    aria-label="Resize the navigation"
+                    aria-label="Resize the floor plan"
                     // A 1px line with a wider invisible grab area.
                     className="bg-border hover:bg-primary/60 focus-visible:bg-primary data-[separator=active]:bg-primary relative w-px transition-colors outline-none after:absolute after:-inset-x-1.5 after:inset-y-0"
                 />

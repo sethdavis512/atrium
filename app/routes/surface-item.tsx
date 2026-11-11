@@ -31,7 +31,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     const { surfaceId } = useParams();
     const message =
         isRouteErrorResponse(error) && error.status === 404
-            ? 'That card is not on this surface.'
+            ? 'That card is not in this room.'
             : 'Something went wrong opening that card.';
 
     return (

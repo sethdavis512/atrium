@@ -129,7 +129,7 @@ test.describe('Surface', () => {
     }) => {
         await page.goto(SURFACE);
         await waitForHydration(page);
-        const nav = page.getByRole('navigation', { name: 'Surface' });
+        const nav = page.getByRole('navigation', { name: 'Floor plan' });
 
         // Scoped: once opened, the brief is also listed under Recent.
         const brief = nav
@@ -221,7 +221,7 @@ test.describe('Surface', () => {
     }) => {
         await page.goto(SURFACE);
         await waitForHydration(page);
-        const nav = page.getByRole('navigation', { name: 'Surface' });
+        const nav = page.getByRole('navigation', { name: 'Floor plan' });
         const recent = nav.getByRole('region', { name: 'Recent' });
         await expect(recent).toHaveCount(0);
 
@@ -281,7 +281,7 @@ test.describe('Surface', () => {
         await expect(chat.getByText('Hello from an agent')).toBeVisible();
         await expect(
             page
-                .getByRole('navigation', { name: 'Surface' })
+                .getByRole('navigation', { name: 'Floor plan' })
                 .getByRole('link', { name: title }),
         ).toBeVisible();
     });
@@ -647,7 +647,7 @@ test.describe('Surface', () => {
     }) => {
         await page.goto(SURFACE);
         await waitForHydration(page);
-        const nav = page.getByRole('navigation', { name: 'Surface' });
+        const nav = page.getByRole('navigation', { name: 'Floor plan' });
         const order = () =>
             nav
                 .locator('[data-nav-section]')
@@ -731,7 +731,7 @@ test.describe('Surface', () => {
     }) => {
         await page.goto(SURFACE);
         await waitForHydration(page);
-        const nav = page.getByRole('navigation', { name: 'Surface' });
+        const nav = page.getByRole('navigation', { name: 'Floor plan' });
         const chats = nav.getByRole('region', { name: 'Chats' });
         const toggle = chats.getByRole('button', {
             name: 'Chats',
@@ -773,7 +773,7 @@ test.describe('Surface', () => {
         await page.goto(SURFACE);
         await waitForHydration(page);
         for (const element of [
-            page.getByRole('navigation', { name: 'Surface' }),
+            page.getByRole('navigation', { name: 'Floor plan' }),
             page.getByRole('toolbar', { name: 'Filter cards' }),
         ]) {
             await expect(element).toHaveCSS('scrollbar-width', 'none');
@@ -791,26 +791,30 @@ test.describe('Surface', () => {
         const humanDoc = page.getByRole('article', {
             name: 'Document: Atlas launch brief',
         });
-        await expect(agentDoc.getByTitle('Made by an agent')).toBeVisible();
-        await expect(humanDoc.getByTitle('Made by an agent')).toHaveCount(0);
+        await expect(
+            agentDoc.getByTitle('Made by the Concierge'),
+        ).toBeVisible();
+        await expect(humanDoc.getByTitle('Made by the Concierge')).toHaveCount(
+            0,
+        );
 
-        const nav = page.getByRole('navigation', { name: 'Surface' });
+        const nav = page.getByRole('navigation', { name: 'Floor plan' });
         await expect(
             nav
                 .getByRole('link', { name: /Northwind SSO questions/ })
-                .getByRole('img', { name: 'Made by an agent' }),
+                .getByRole('img', { name: 'Made by the Concierge' }),
         ).toBeVisible();
         await expect(
             nav
                 .getByRole('link', { name: /Atlas launch brief/ })
-                .getByRole('img', { name: 'Made by an agent' }),
+                .getByRole('img', { name: 'Made by the Concierge' }),
         ).toHaveCount(0);
 
         // And the filter can show only what agents made.
         await (
             await openFilters(page)
         )
-            .getByRole('button', { name: 'By agent' })
+            .getByRole('button', { name: 'By Concierge' })
             .click();
         await expect(page.locator('[data-node-id="doc-brief"]')).toHaveCSS(
             'opacity',
@@ -1191,7 +1195,7 @@ test.describe('Surface', () => {
         await expect(photo.getByText('GIF', { exact: true })).toHaveCount(0);
         await expect(
             page
-                .getByRole('navigation', { name: 'Surface' })
+                .getByRole('navigation', { name: 'Floor plan' })
                 .getByRole('region', { name: 'Images' })
                 .getByRole('link'),
         ).toHaveCount(2);
@@ -1253,9 +1257,11 @@ test.describe('Surface', () => {
         await waitForHydration(page);
         await page.keyboard.press('ControlOrMeta+k');
         const palette = page.getByRole('dialog', {
-            name: 'Search the surface',
+            name: 'Directory',
         });
-        const input = palette.getByRole('combobox', { name: 'Search' });
+        const input = palette.getByRole('combobox', {
+            name: 'Search the directory',
+        });
         await expect(input).toBeFocused();
         await input.pressSequentially('call the 6th', { delay: 20 });
         await expect(input).toBeFocused();
@@ -1281,8 +1287,10 @@ test.describe('Surface', () => {
         ).toBeInViewport();
 
         // ⌘Enter focuses the item.
-        await page.getByRole('button', { name: 'Search' }).first().click();
-        await palette.getByRole('combobox', { name: 'Search' }).fill('ATL-13');
+        await page.getByRole('button', { name: 'Directory' }).first().click();
+        await palette
+            .getByRole('combobox', { name: 'Search the directory' })
+            .fill('ATL-13');
         await expect(
             palette.getByRole('option', { name: /Atlas launch/ }),
         ).toContainText('ATL-13');
@@ -1334,9 +1342,7 @@ test.describe('Surface', () => {
         const response = await page.goto(SURFACE + '/cards/not-a-thing');
         expect(response?.status()).toBe(404);
         await expect(
-            page
-                .getByRole('alert')
-                .getByText('That card is not on this surface.'),
+            page.getByRole('alert').getByText('That card is not in this room.'),
         ).toBeVisible();
         await expect(
             page.getByRole('application', { name: 'Atrium canvas' }),

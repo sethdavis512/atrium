@@ -39,7 +39,7 @@ export function SurfaceSwitcher({
     return (
         <Menu>
             <MenuTrigger
-                aria-label={`Surface: ${name}, in ${space.name}. Switch surface`}
+                aria-label={`Room: ${name}, in ${space.name}. Switch room`}
                 title={compact ? `${space.name} / ${name}` : undefined}
                 className={
                     compact
@@ -83,7 +83,7 @@ export function SurfaceSwitcher({
                                     {surface.name}
                                 </span>
                                 {surface.id === surfaceId && (
-                                    <CheckIcon aria-label="Current surface" />
+                                    <CheckIcon aria-label="Current room" />
                                 )}
                             </MenuLinkItem>
                         ))}

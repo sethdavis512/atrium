@@ -80,7 +80,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                             Spaces
                         </h1>
                         <p className="text-muted-foreground text-sm">
-                            Each space holds surfaces; each surface holds cards.
+                            Each space holds rooms; each room holds cards.
                         </p>
                     </div>
                     <NewForm
@@ -118,8 +118,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                             <li className="flex items-center rounded-xl border border-dashed p-4">
                                 <NewForm
                                     intent="create-surface"
-                                    label="New surface"
-                                    placeholder="Surface name"
+                                    label="New room"
+                                    placeholder="Room name"
                                     spaceId={space.id}
                                 />
                             </li>

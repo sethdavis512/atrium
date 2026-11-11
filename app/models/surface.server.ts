@@ -97,7 +97,7 @@ const PEOPLE: Person[] = [
         initials: 'RA',
         role: 'Customer Success',
     },
-    { id: AGENT_ID, name: 'Surface Agent', initials: 'AI', role: 'Agent' },
+    { id: AGENT_ID, name: 'Concierge', initials: 'AI', role: 'Agent' },
 ];
 
 /** A surface as stored: its name, and how its cards sit. */
@@ -129,7 +129,7 @@ export const SEED_SURFACE_ID = 'atlas-launch';
 
 /** What the agent says first in the chat every new surface starts with. */
 const AGENT_GREETING =
-    "Hi! I work on this surface with you. Ask me to draft a doc, chart some numbers, start an issue board, pin a note, sketch, or pull in a page, video, or image, and I'll put it on the canvas next to this chat.";
+    "Hi! I work in this room with you. Ask me to draft a doc, chart some numbers, start an issue board, pin a note, sketch, or pull in a page, video, or image, and I'll put it on the canvas next to this chat.";
 
 /**
  * The chat with the agent a surface starts with: whoever writes first
@@ -140,7 +140,7 @@ function agentChat(surfaceId: string, id: string, sentAt: string): ChatItem {
         kind: 'chat',
         id,
         surfaceId,
-        title: 'Ask the agent',
+        title: 'Ask the Concierge',
         participantIds: [AGENT_ID],
         messages: [
             {
@@ -168,13 +168,14 @@ function playground(): {
         space: {
             id: 'playground',
             name: 'Playground',
-            description: 'Try the agent on a blank canvas.',
+            description: 'Try the Concierge on a blank canvas.',
         },
         surface: {
             id: chat.surfaceId,
             spaceId: 'playground',
             name: 'Agent test drive',
-            description: 'One chat with the agent; what it makes lands here.',
+            description:
+                'One chat with the Concierge; what it makes lands here.',
             arrangement: emptyArrangement([chat.id]),
         },
         chat,
@@ -503,7 +504,7 @@ The work is tracked on the board:
                 createdById: AGENT_ID,
                 updatedAt: '2026-10-23T10:30:00Z',
                 blocks: markdownToPortableText(`
-Drafted by the Surface Agent from [the chat with Rosa](item:chat-customers), so customer success has one answer to send.
+Drafted by the Concierge from [the chat with Rosa](item:chat-customers), so customer success has one answer to send.
 
 ## What Northwind asked
 
@@ -888,7 +889,7 @@ function requireItem(id: string): SurfaceItem {
 
 function requireSurface(id: string): SurfaceRecord {
     const surface = store().surfaces.find((candidate) => candidate.id === id);
-    if (!surface) throw new SurfaceError(`No surface with id "${id}".`);
+    if (!surface) throw new SurfaceError(`No room with id "${id}".`);
     return surface;
 }
 
@@ -920,7 +921,7 @@ function surfaceFor(
     if (parentId) return requireItem(parentId).surfaceId;
     if (!surfaceId) {
         throw new SurfaceError(
-            'Say which surface it goes on (surfaceId; see list_spaces).',
+            'Say which room it goes in (surfaceId; see list_spaces).',
         );
     }
     return requireSurface(surfaceId).id;
@@ -931,7 +932,7 @@ function requireReferencesOn(surfaceId: string, blocks: DocumentBlock[]) {
     for (const id of referencedItemIds(blocks)) {
         if (requireItem(id).surfaceId !== surfaceId) {
             throw new SurfaceError(
-                `"${id}" is on another surface; documents link to cards on their own surface.`,
+                `"${id}" is in another room; documents link to cards in their own room.`,
             );
         }
     }
@@ -1350,9 +1351,7 @@ export function linkItems({
     label: string;
 }): Relation {
     if (requireItem(from).surfaceId !== requireItem(to).surfaceId) {
-        throw new SurfaceError(
-            'Cards on different surfaces can not be linked.',
-        );
+        throw new SurfaceError('Cards in different rooms can not be linked.');
     }
     const relation: Relation = { id: newId('rel'), from, to, label };
     store().relations.push(relation);
@@ -1434,7 +1433,7 @@ export function saveView({
     requireSurface(surfaceId);
     for (const id of itemIds ?? []) {
         if (requireItem(id).surfaceId !== surfaceId) {
-            throw new SurfaceError(`"${id}" is not on this surface.`);
+            throw new SurfaceError(`"${id}" is not in this room.`);
         }
     }
     const view: SavedView = {
@@ -1852,7 +1851,7 @@ export function addCard({
 }): SurfaceItem {
     requireSurface(surfaceId);
     if (attachedTo && requireItem(attachedTo).surfaceId !== surfaceId) {
-        throw new SurfaceError(`"${attachedTo}" is not on this surface.`);
+        throw new SurfaceError(`"${attachedTo}" is not in this room.`);
     }
     const named = title?.trim() || undefined;
     const needUrl = () => {
@@ -1957,7 +1956,7 @@ export function addCard({
         case 'ui':
             item = createUi({
                 surfaceId,
-                title: named ?? 'Surface at a glance',
+                title: named ?? 'Room at a glance',
                 spec: STARTER_UI,
                 authorId,
             });
@@ -2161,7 +2160,7 @@ const STARTER_UI: UiItem['spec'] = {
         },
         heading: {
             type: 'Heading',
-            props: { text: 'This surface', level: null },
+            props: { text: 'This room', level: null },
         },
         metrics: {
             type: 'Grid',
@@ -2195,7 +2194,7 @@ const STARTER_UI: UiItem['spec'] = {
         hint: {
             type: 'Text',
             props: {
-                text: 'Ask the agent to turn this into the view you need: a triage list, a review queue, a launch tracker.',
+                text: 'Ask the Concierge to turn this into the view you need: a triage list, a review queue, a launch tracker.',
                 muted: true,
             },
         },
@@ -2514,7 +2513,7 @@ export function arrangeCards({
     const unknown = groups.flat().filter((id) => !ids.has(id));
     if (unknown.length > 0) {
         throw new SurfaceError(
-            `Not on this surface: ${unknown.join(', ')}. See list_cards.`,
+            `Not in this room: ${unknown.join(', ')}. See list_cards.`,
         );
     }
     const { arrangement } = surface;

@@ -85,14 +85,14 @@ export function NavRail({ surface, navOrder, onSearch }: Props) {
 
     return (
         <nav
-            aria-label="Surface"
+            aria-label="Floor plan"
             className="flex min-h-0 flex-1 scrollbar-none flex-col items-center gap-1 overflow-y-auto py-3"
         >
             <button
                 type="button"
                 onClick={toggle}
-                aria-label="Expand navigation"
-                title="Expand navigation"
+                aria-label="Expand floor plan"
+                title="Expand floor plan"
                 className={railItemClassName({ isActive: false })}
             >
                 <PanelLeftOpenIcon aria-hidden="true" className="size-4" />
@@ -107,8 +107,8 @@ export function NavRail({ surface, navOrder, onSearch }: Props) {
             <button
                 type="button"
                 onClick={onSearch}
-                aria-label="Search"
-                title="Search (⌘K)"
+                aria-label="Directory"
+                title="Directory (⌘K)"
                 className={railItemClassName({ isActive: false })}
             >
                 <SearchIcon aria-hidden="true" className="size-4" />

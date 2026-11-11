@@ -241,7 +241,7 @@ export function CanvasMenu({
                 </ContextMenuItem>
                 <ContextMenuItem onClick={onSearch}>
                     <SearchIcon aria-hidden="true" />
-                    Search
+                    Directory
                     <ContextMenuShortcut>⌘K</ContextMenuShortcut>
                 </ContextMenuItem>
             </>

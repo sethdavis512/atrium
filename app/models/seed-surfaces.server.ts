@@ -255,7 +255,7 @@ export function launchRetroSurface(surfaceId: string): SeedSurface {
                 ['maya', 'Search feels slow on big workspaces.', '13:00'],
                 [
                     AGENT_ID,
-                    'The index rebuilds on every keystroke. Caching it per surface and rebuilding only when cards change: 38ms down to 2ms on 2,000 cards.',
+                    'The index rebuilds on every keystroke. Caching it per room and rebuilding only when cards change: 38ms down to 2ms on 2,000 cards.',
                     '13:20',
                 ],
                 ['dev', 'Merged. Nice.', '14:05'],
@@ -263,12 +263,12 @@ export function launchRetroSurface(surfaceId: string): SeedSurface {
             pr: {
                 id: 'pr-search-cache',
                 number: 495,
-                title: 'Cache the search index per surface',
+                title: 'Cache the search index per room',
                 repo: 'acme/atlas',
                 branch: 'agent/search-cache',
                 status: 'merged',
                 summary:
-                    'Builds the search index once per surface and reuses it until a card changes.',
+                    'Builds the search index once per room and reuses it until a card changes.',
                 checks: { passed: 16, failed: 0, pending: 0 },
                 files: [
                     { path: 'app/lib/search.ts', additions: 41, deletions: 9 },

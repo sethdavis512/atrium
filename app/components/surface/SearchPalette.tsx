@@ -160,7 +160,7 @@ export function SearchPalette({
                 if (!next) setQuery('');
             }}
         >
-            <CommandDialogPopup aria-label="Search the surface">
+            <CommandDialogPopup aria-label="Directory">
                 <Command
                     items={groups}
                     filteredItems={groups}
@@ -176,8 +176,8 @@ export function SearchPalette({
                     }}
                 >
                     <CommandInput
-                        aria-label="Search"
-                        placeholder="Search chats, documents, issues, pages…"
+                        aria-label="Search the directory"
+                        placeholder="Find chats, documents, issues, pages…"
                         onKeyDown={(event) => {
                             if (
                                 event.key === 'Enter' &&
@@ -194,8 +194,8 @@ export function SearchPalette({
                     <CommandPanel>
                         <CommandEmpty>
                             {query.trim()
-                                ? 'Nothing on the surface matches.'
-                                : 'Type to search everything on the surface.'}
+                                ? 'Nothing in the room matches.'
+                                : 'Type to search everything in the room.'}
                         </CommandEmpty>
                         <CommandList>
                             {(group: Group) => (

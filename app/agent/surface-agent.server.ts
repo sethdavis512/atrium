@@ -106,7 +106,7 @@ const attachedToSchema = z
     .string()
     .optional()
     .describe(
-        'A chat or document on this surface to hang it under. Defaults to this chat.',
+        'A chat or document in this room to hang it under. Defaults to this chat.',
     );
 
 /** Tools scoped to one chat and the surface it's on. */
@@ -122,7 +122,7 @@ export function surfaceTools({
         const item = getItem(itemId);
         if (item.surfaceId !== surfaceId) {
             throw new SurfaceError(
-                `"${itemId}" is on another surface; you can only work on this one.`,
+                `"${itemId}" is in another room; you can only work on this one.`,
             );
         }
         return item;
@@ -147,7 +147,7 @@ export function surfaceTools({
     return {
         list_spaces: tool({
             description:
-                'Every space in the workspace and the surfaces in each: id, name, description, and how many cards. Other surfaces are yours to read, not change.',
+                'Every space in the workspace and the rooms in each: id, name, description, and how many cards. Other rooms are yours to read, not change.',
             inputSchema: z.object({}),
             execute: () => ({
                 spaces: getWorkspace().spaces.map((space) => ({
@@ -165,12 +165,12 @@ export function surfaceTools({
         }),
         list_cards: tool({
             description:
-                'Every card on a surface (this one unless you name another): id, kind, and title. Call it before referring to cards you have not seen this turn.',
+                'Every card in a room (this one unless you name another): id, kind, and title. Call it before referring to cards you have not seen this turn.',
             inputSchema: z.object({
                 surfaceId: z
                     .string()
                     .optional()
-                    .describe('Another surface to list (see list_spaces).'),
+                    .describe('Another room to list (see list_spaces).'),
             }),
             execute: ({ surfaceId: listed = surfaceId }) => ({
                 cards: allItems()
@@ -180,7 +180,7 @@ export function surfaceTools({
         }),
         read_card: tool({
             description:
-                "One card in full, on any surface: a document's Markdown, a chat's recent messages, a board's issues, a chart's numbers, and so on.",
+                "One card in full, in any room: a document's Markdown, a chat's recent messages, a board's issues, a chart's numbers, and so on.",
             inputSchema: z.object({ cardId: z.string() }),
             execute: ({ cardId }) => {
                 const item = getItem(cardId);
@@ -191,7 +191,7 @@ export function surfaceTools({
         }),
         look_at_card: tool({
             description:
-                'See a sketch or an image card as a picture, on any surface: what it shows, which read_card cannot give you (a sketch there is only stroke coordinates). Look before you describe, build on, or make cards from a drawing, wireframe, diagram, screenshot, or photo.',
+                'See a sketch or an image card as a picture, in any room: what it shows, which read_card cannot give you (a sketch there is only stroke coordinates). Look before you describe, build on, or make cards from a drawing, wireframe, diagram, screenshot, or photo.',
             inputSchema: z.object({ cardId: z.string() }),
             // The transcript keeps just which card; the picture goes to
             // the model only, drawn from the card as it is now.
@@ -225,13 +225,13 @@ export function surfaceTools({
         }),
         search: tool({
             description:
-                "Finds cards by what's in them (titles, messages, document text, issues, captions), on this surface or, with everywhere, across every space. Every word must match; prefixes and small typos are fine.",
+                "Finds cards by what's in them (titles, messages, document text, issues, captions), in this room or, with everywhere, across every space. Every word must match; prefixes and small typos are fine.",
             inputSchema: z.object({
                 query: z.string().min(1).max(200),
                 everywhere: z
                     .boolean()
                     .optional()
-                    .describe('Search every surface in the workspace.'),
+                    .describe('Search every room in the workspace.'),
             }),
             execute: ({ query, everywhere = false }) => {
                 const people = new Map(
@@ -259,7 +259,7 @@ export function surfaceTools({
         }),
         create_document: tool({
             description:
-                'Writes a new document card on the surface. Use it for anything longer than a couple of paragraphs: briefs, plans, notes, specs, summaries.',
+                'Writes a new document card in the room. Use it for anything longer than a couple of paragraphs: briefs, plans, notes, specs, summaries.',
             inputSchema: z.object({
                 title: z.string().min(1).max(160),
                 markdown: markdownSchema,
@@ -408,7 +408,7 @@ export function surfaceTools({
             execute: (input) => madeHere(createSketch({ surfaceId, ...input })),
         }),
         create_ui: tool({
-            description: `Puts a UI card on this surface: a small live interface (a dashboard, a triage list, a review queue, a tracker) you compose from a fixed set of components, bound to the surface's own data so it stays current. Use it when someone wants to see or act on the surface's work at a glance, not for prose (that's a document).\n\n${uiGuide()}`,
+            description: `Puts a UI card in this room: a small live interface (a dashboard, a triage list, a review queue, a tracker) you compose from a fixed set of components, bound to the room's own data so it stays current. Use it when someone wants to see or act in the room's work at a glance, not for prose (that's a document).\n\n${uiGuide()}`,
             inputSchema: z.object({
                 title: z.string().min(1).max(TITLE_MAX),
                 spec: uiSpecInputSchema,
@@ -417,7 +417,7 @@ export function surfaceTools({
         }),
         update_ui: tool({
             description:
-                "Replaces a UI card's spec (and optionally its title) on this surface: read_card first to see the current spec. Same rules as create_ui.",
+                "Replaces a UI card's spec (and optionally its title) in this room: read_card first to see the current spec. Same rules as create_ui.",
             inputSchema: z.object({
                 uiId: z.string(),
                 title: z.string().min(1).max(TITLE_MAX).optional(),
@@ -491,13 +491,13 @@ export function surfaceTools({
         }),
         get_layout: tool({
             description:
-                "Where every card sits on the surface: x, y (top-left, in canvas pixels), width, height, what it hangs under, and whether it's locked. Read it before arranging or moving cards.",
+                "Where every card sits in the room: x, y (top-left, in canvas pixels), width, height, what it hangs under, and whether it's locked. Read it before arranging or moving cards.",
             inputSchema: z.object({}),
             execute: () => ({ cards: getLayout(surfaceId) }),
         }),
         arrange_cards: tool({
             description:
-                'Lays cards out in groups so the surface reads at a glance: each group a column of cards (groups side by side, left to right) or a row (groups top to bottom). Group what belongs together (a chat with what it produced, a plan with its board, references with each other) and order groups the way the work flows. To title a group, add a sticky note and put it first. Cards hanging under another (charts, pull requests, pages, videos, images) travel with it; locked cards stay put. Cards no group names go in a last group unless rest is "leave". Everyone\'s canvas slides to the new layout.',
+                'Lays cards out in groups so the room reads at a glance: each group a column of cards (groups side by side, left to right) or a row (groups top to bottom). Group what belongs together (a chat with what it produced, a plan with its board, references with each other) and order groups the way the work flows. To title a group, add a sticky note and put it first. Cards hanging under another (charts, pull requests, pages, videos, images) travel with it; locked cards stay put. Cards no group names go in a last group unless rest is "leave". Everyone\'s canvas slides to the new layout.',
             inputSchema: z.object({
                 groups: z
                     .array(z.array(z.string()).min(1))
@@ -524,7 +524,7 @@ export function surfaceTools({
         }),
         link_cards: tool({
             description:
-                'Draws a labeled link from one card on this surface to another, e.g. "references" or "next".',
+                'Draws a labeled link from one card in this room to another, e.g. "references" or "next".',
             inputSchema: z.object({
                 from: z.string(),
                 to: z.string(),
@@ -596,13 +596,13 @@ function instructions(chat: ChatItem, { remembers }: { remembers: boolean }) {
         .slice(0, 80)
         .map((item) => `- ${item.id} (${item.kind}): ${item.title}`)
         .join('\n');
-    return `You are Surface Agent, working with a teammate in the chat "${chat.title}" (id ${chat.id}) on a shared canvas of cards. Cards are chats, documents, charts, issue boards, sticky notes, sketches, web pages, videos, images, pull requests, and UI cards (live interfaces over the surface's data: dashboards, triage lists, review queues).
+    return `You are the Concierge, working with a teammate in the chat "${chat.title}" (id ${chat.id}) on a shared canvas of cards. Cards are chats, documents, charts, issue boards, sticky notes, sketches, web pages, videos, images, pull requests, and UI cards (live interfaces over the room's data: dashboards, triage lists, review queues).
 
 Sketches and image cards are pictures: call look_at_card to see one before you describe it or build from it (a wireframe into an issue board, a whiteboard photo into a document). read_card only gives a sketch's stroke coordinates.
 
 Make things, don't just describe them: when the teammate asks for a plan, a summary, notes, numbers, tasks, a diagram, or references, call the tools so the work lands on the canvas as cards, then reply briefly with what you made. Long writing belongs in a document, not the chat. Several cards in one turn are fine when the request calls for them (a board and its issues, a doc and its chart). When the canvas gets busy, or when asked to tidy or organize it, read get_layout and arrange_cards into groups that make sense together.
 
-You can read the whole workspace: list_spaces, then list_cards, read_card, or search with everywhere on other surfaces, when a question reaches beyond this surface (another team's plans, a customer's account). You can only make or change cards on this surface; say where you found anything from elsewhere. Card links ([title](item:<cardId>)) only work for cards on this surface: name a card from elsewhere in plain text with its surface, e.g. "Northwind account plan (on Northwind)".
+You can read the whole workspace: list_spaces, then list_cards, read_card, or search with everywhere in other rooms, when a question reaches beyond this room (another team's plans, a customer's account). You can only make or change cards in this room; say where you found anything from elsewhere. Card links ([title](item:<cardId>)) only work for cards in this room: name a card from elsewhere in plain text with its room, e.g. "Northwind account plan (on Northwind)".
 ${
     remembers
         ? `
@@ -610,7 +610,7 @@ Your working memory is shared by every agent chat in every space of this workspa
 `
         : ''
 }
-Replies are short chat messages in Markdown. Mention a card on this surface that you made or used as [its title](item:<cardId>) so it shows as a chip. Ask a quick question when a request is truly ambiguous; otherwise make reasonable choices and say what you chose.
+Replies are short chat messages in Markdown. Mention a card in this room that you made or used as [its title](item:<cardId>) so it shows as a chip. Ask a quick question when a request is truly ambiguous; otherwise make reasonable choices and say what you chose.
 
 Today is ${new Date().toDateString()}. People (each message is prefixed with who wrote it): ${listPeople()
         .map((person) =>
@@ -620,7 +620,7 @@ Today is ${new Date().toDateString()}. People (each message is prefixed with who
         )
         .join(', ')}.
 
-This chat is on the surface ${placeOf(chat.surfaceId).surface} (id ${chat.surfaceId}) in the ${placeOf(chat.surfaceId).space} space. Cards on it now:
+This chat is in the room ${placeOf(chat.surfaceId).surface} (id ${chat.surfaceId}) in the ${placeOf(chat.surfaceId).space} space. Cards in it now:
 ${cards || '(none yet besides this chat)'}`;
 }
 
@@ -672,7 +672,7 @@ export function createSurfaceAgent(chat: ChatItem, memory: Memory | null) {
     const anthropic = createAnthropic({ apiKey: env.ANTHROPIC_API_KEY });
     return new Agent({
         id: 'surface-agent',
-        name: 'Surface Agent',
+        name: 'Concierge',
         model: anthropic(AGENT_MODEL),
         instructions: instructions(chat, { remembers: Boolean(memory) }),
         tools: asMastraTools(

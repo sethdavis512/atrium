@@ -87,7 +87,7 @@ export function useSurfaceItems(): SurfaceItems {
  */
 export function useSurfaceLinks() {
     const { surfaceId } = useParams();
-    if (!surfaceId) throw new Error('useSurfaceLinks needs a surface route');
+    if (!surfaceId) throw new Error('useSurfaceLinks needs a room route');
     return {
         surfaceId,
         action: surfacePath(surfaceId),

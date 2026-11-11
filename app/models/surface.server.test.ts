@@ -419,7 +419,7 @@ describe('surface store', () => {
                 kind: 'chart',
                 attachedTo: chat.id,
             }),
-        ).toThrow(/not on this surface/);
+        ).toThrow(/not in this room/);
     });
 
     it('sticks notes on a surface, named by their first line, and rewrites them', async () => {

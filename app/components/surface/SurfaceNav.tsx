@@ -167,7 +167,7 @@ export function SurfaceNav({
 
     return (
         <nav
-            aria-label="Surface"
+            aria-label="Floor plan"
             className="flex scrollbar-none flex-col gap-6 overflow-y-auto p-4"
         >
             <DndContext

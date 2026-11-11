@@ -17,7 +17,7 @@ async function mcp(page: Page, name: string, args: Record<string, unknown>) {
 
 /** A surface of the test's own, so nothing here touches the seed. */
 async function freshSurface(page: Page) {
-    const surface = await mcp(page, 'create_surface', {
+    const surface = await mcp(page, 'create_room', {
         spaceId: 'design',
         name: `Controls ${crypto.randomUUID().slice(0, 6)}`,
     });
@@ -296,7 +296,7 @@ test.describe('Canvas controls', () => {
             .toBe('Floor plan');
         await expect(
             page
-                .getByRole('navigation', { name: 'Surface' })
+                .getByRole('navigation', { name: 'Floor plan' })
                 .getByText('Floor plan'),
         ).toBeVisible();
 
